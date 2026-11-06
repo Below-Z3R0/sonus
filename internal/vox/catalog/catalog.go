@@ -13,6 +13,12 @@ type Profile struct {
 	MaxChars int     `json:"max_chars"`
 }
 
+type Archive struct {
+	URL       string `json:"url"`
+	SizeBytes int64  `json:"size_bytes"`
+	SHA256    string `json:"sha256,omitempty"`
+}
+
 type Model struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
@@ -26,6 +32,7 @@ type Model struct {
 	Languages int     `json:"languages"`
 	Voices    []Voice `json:"voices"`
 	Profile   Profile `json:"profile"`
+	Archive   Archive `json:"archive"`
 }
 
 var models = []Model{
@@ -42,6 +49,7 @@ var models = []Model{
 			{ID: "am_puck", Language: "en-US", Gender: "male"},
 		},
 		Profile: Profile{Speed: 1.0, MaxChars: 400},
+		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2", SizeBytes: 349886476},
 	},
 	{
 		ID: "piper-es-onnx", Name: "Piper Spanish (ONNX)",

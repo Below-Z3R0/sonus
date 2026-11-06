@@ -8,6 +8,12 @@ type Profile struct {
 	ChunkSeconds int  `json:"chunk_seconds"`
 }
 
+type Archive struct {
+	URL       string `json:"url"`
+	SizeBytes int64  `json:"size_bytes"`
+	SHA256    string `json:"sha256,omitempty"`
+}
+
 type Model struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
@@ -20,6 +26,7 @@ type Model struct {
 	DiskMB    int     `json:"disk_mb"`
 	Languages int     `json:"languages"`
 	Profile   Profile `json:"profile"`
+	Archive   Archive `json:"archive"`
 }
 
 var models = []Model{
@@ -30,6 +37,7 @@ var models = []Model{
 		Notes:    "Multilingual ASR; encoder/decoder ONNX export; 4 decoder layers.",
 		RAMMB:    1600, DiskMB: 1200, Languages: 99,
 		Profile: Profile{BeamSize: 5, VAD: true, ChunkSeconds: 30},
+		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-turbo.tar.bz2", SizeBytes: 563790207},
 	},
 	{
 		ID: "whisper-small-onnx", Name: "Whisper small (ONNX)",
@@ -38,6 +46,7 @@ var models = []Model{
 		Notes:    "CPU fallback; lower memory and latency.",
 		RAMMB:    600, DiskMB: 500, Languages: 99,
 		Profile: Profile{BeamSize: 3, VAD: true, ChunkSeconds: 30},
+		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2", SizeBytes: 639387718},
 	},
 }
 

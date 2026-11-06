@@ -2,12 +2,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/Below-Z3R0/sonus/internal/api"
 	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/modeldl"
 	"github.com/Below-Z3R0/sonus/internal/runtime"
 )
 
@@ -26,7 +28,12 @@ func main() {
 		model = m
 	}
 
-	mgr := runtime.New("auris", version, model.ID, func(string) error { return nil }, func() {})
+	mgr := runtime.New("auris", version, model.ID, func(id string) error {
+		if st := modeldl.Status(cfg.Paths.Models, id); st.State != "ready" {
+			return fmt.Errorf("%s no está instalado", id)
+		}
+		return nil
+	}, func() {})
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
 	mux.HandleFunc("/v1/transcribe", func(w http.ResponseWriter, _ *http.Request) {

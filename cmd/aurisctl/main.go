@@ -14,6 +14,7 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
 	"github.com/Below-Z3R0/sonus/internal/cliutil"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/modeldl"
 )
 
 const version = "0.1.0"
@@ -61,14 +62,25 @@ func modelsCmd(args []string) error {
 	}
 	rows := make([]cliutil.ModelRow, 0, len(catalog.List()))
 	for _, m := range catalog.List() {
-		rows = append(rows, cliutil.ModelRow{ID: m.ID, Tier: m.Tier})
+		rows = append(rows, cliutil.ModelRow{
+			ID: m.ID, Tier: m.Tier,
+			State: modeldl.Describe(modeldl.Status(cfg.Paths.Models, m.ID)),
+		})
 	}
 	show := func(id string) (any, bool) {
 		m, ok := catalog.Get(id)
 		return m, ok
 	}
 	set := func(c *config.Config, id string) { c.Defaults.ASR = id }
-	return cliutil.RunModels(args, cfgPath, cfg.Defaults.ASR, rows, show, set)
+	install := func(id string, force bool) error {
+		m, ok := catalog.Get(id)
+		if !ok || m.Archive.URL == "" {
+			return fmt.Errorf("%s no tiene descarga", id)
+		}
+		return modeldl.Install(cfg.Paths.Models, id, m.Archive.URL, m.Archive.SizeBytes, m.Archive.SHA256, force)
+	}
+	remove := func(id string) error { return modeldl.Remove(cfg.Paths.Models, id) }
+	return cliutil.RunModels(args, cfgPath, cfg.Defaults.ASR, rows, show, set, install, remove)
 }
 
 func transcribeCmd(base string, args []string) error {

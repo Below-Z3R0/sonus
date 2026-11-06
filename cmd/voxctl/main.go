@@ -13,6 +13,7 @@ import (
 
 	"github.com/Below-Z3R0/sonus/internal/cliutil"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/modeldl"
 	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 )
 
@@ -81,7 +82,9 @@ func modelsCmd(args []string) error {
 	rows := make([]cliutil.ModelRow, 0, len(catalog.List()))
 	for _, m := range catalog.List() {
 		rows = append(rows, cliutil.ModelRow{
-			ID: m.ID, Tier: m.Tier, Extra: fmt.Sprintf("%d voices", len(m.Voices)),
+			ID: m.ID, Tier: m.Tier,
+			Extra: fmt.Sprintf("%d voices", len(m.Voices)),
+			State: modeldl.Describe(modeldl.Status(cfg.Paths.Models, m.ID)),
 		})
 	}
 	show := func(id string) (any, bool) {
@@ -89,7 +92,15 @@ func modelsCmd(args []string) error {
 		return m, ok
 	}
 	set := func(c *config.Config, id string) { c.Defaults.TTS = id }
-	return cliutil.RunModels(args, cfgPath, cfg.Defaults.TTS, rows, show, set)
+	install := func(id string, force bool) error {
+		m, ok := catalog.Get(id)
+		if !ok || m.Archive.URL == "" {
+			return fmt.Errorf("%s no tiene descarga", id)
+		}
+		return modeldl.Install(cfg.Paths.Models, id, m.Archive.URL, m.Archive.SizeBytes, m.Archive.SHA256, force)
+	}
+	remove := func(id string) error { return modeldl.Remove(cfg.Paths.Models, id) }
+	return cliutil.RunModels(args, cfgPath, cfg.Defaults.TTS, rows, show, set, install, remove)
 }
 
 func speakCmd(base string, args []string) error {

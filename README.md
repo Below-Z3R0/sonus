@@ -53,11 +53,30 @@ voxctl service unload
 `unload` cierra el modelo y llama `debug.FreeOSMemory`; el contenedor, el HTTP y el MCP (cuando esté)
 siguen vivos. No hace falta apagar Docker para liberar RAM.
 
-`models use <id>` solo cambia el default; para aplicarlo ahora:
+`models use <id>` solo cambia el default y exige que el modelo esté instalado. Para aplicarlo:
 
 ```bash
-voxctl service load <id>
+voxctl models install kokoro-82m-onnx
+voxctl models use kokoro-82m-onnx
+voxctl service load kokoro-82m-onnx
 ```
+
+## Estados de descarga
+
+```bash
+voxctl models list
+ID               TIER      DEFAULT  STATE     EXTRA
+kokoro-82m-onnx  balanced  *        ready     4 voices
+piper-es-onnx    fast               missing   2 voices
+```
+
+- `missing`: no está en el volumen.
+- `downloading 42%`: descarga en curso; el porcentaje queda en `.state.json` si se corta.
+- `ready`: instalado y verificado.
+- `failed`: error; `models install --force` reintenta.
+
+`models install` descarga con progreso (`%` y MB), extrae el `.tar.bz2` y escribe `.installed.json`.
+`models remove` borra el modelo del volumen. `service load` rechaza un modelo que no esté `ready`.
 
 ## Modelos
 

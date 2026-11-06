@@ -67,22 +67,23 @@ type ModelRow struct {
 	ID    string
 	Tier  string
 	Extra string
+	State string
 }
 
-// RunModels implements list/show/use for one service catalogue.
-func RunModels(args []string, cfgPath, defaultID string, rows []ModelRow, show func(string) (any, bool), set func(*config.Config, string)) error {
+// RunModels implements list/show/use/install/remove for one service catalogue.
+func RunModels(args []string, cfgPath, defaultID string, rows []ModelRow, show func(string) (any, bool), set func(*config.Config, string), install func(string, bool) error, remove func(string) error) error {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return err
 	}
 	if len(args) == 0 || args[0] == "list" {
-		fmt.Println("ID\tTIER\tDEFAULT\tEXTRA")
+		fmt.Println("ID	TIER	DEFAULT	STATE	EXTRA")
 		for _, row := range rows {
 			def := ""
 			if row.ID == defaultID {
 				def = "*"
 			}
-			fmt.Printf("%s\t%s\t%s\t%s\n", row.ID, row.Tier, def, row.Extra)
+			fmt.Printf("%s	%s	%s	%s	%s\n", row.ID, row.Tier, def, row.State, row.Extra)
 		}
 		return nil
 	}
@@ -107,13 +108,42 @@ func RunModels(args []string, cfgPath, defaultID string, rows []ModelRow, show f
 		if _, ok := show(args[1]); !ok {
 			return fmt.Errorf("modelo %s no existe", args[1])
 		}
+		var state string
+		for _, row := range rows {
+			if row.ID == args[1] {
+				state = row.State
+			}
+		}
+		if state != "ready" {
+			return fmt.Errorf("%s no está instalado; ejecutá models install %s", args[1], args[1])
+		}
 		set(&cfg, args[1])
 		if err := cfg.Save(cfgPath); err != nil {
 			return err
 		}
-		fmt.Printf("default = %s (reiniciá el servicio para cargarlo)\n", args[1])
+		fmt.Printf("default = %s (reiniciá el servicio o usá service load)\n", args[1])
+	case "install":
+		if len(args) < 2 {
+			return errors.New("uso: models install <id> [--force]")
+		}
+		force := len(args) > 2 && args[2] == "--force"
+		if _, ok := show(args[1]); !ok {
+			return fmt.Errorf("modelo %s no existe", args[1])
+		}
+		if install == nil {
+			return errors.New("este catálogo no tiene descargas")
+		}
+		return install(args[1], force)
+	case "remove":
+		if len(args) != 2 {
+			return errors.New("uso: models remove <id>")
+		}
+		if remove == nil {
+			return errors.New("este catálogo no tiene descargas")
+		}
+		return remove(args[1])
 	default:
-		return errors.New("uso: models list|show <id>|use <id>")
+		return errors.New("uso: models list|show <id>|use <id>|install <id> [--force]|remove <id>")
 	}
 	return nil
 }
