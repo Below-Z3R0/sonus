@@ -1,0 +1,28 @@
+services:
+  auris:
+    image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
+    command: ["aurisd", "--addr", "0.0.0.0:9101"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9101:9101"
+    volumes:
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/models:/models
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/data:/data
+      - ${SONUS_MEDIA:-${HOME}/Media}:/media:ro
+    environment:
+      SONUS_MODELS_DIR: /models
+      SONUS_DATA_DIR: /data
+
+  vox:
+    image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
+    command: ["voxd", "--addr", "0.0.0.0:9102"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9102:9102"
+    volumes:
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/models:/models
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/data:/data
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/output:/output
+    environment:
+      SONUS_MODELS_DIR: /models
+      SONUS_DATA_DIR: /data
