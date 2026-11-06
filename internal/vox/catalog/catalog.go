@@ -49,7 +49,7 @@ var models = []Model{
 			{ID: "am_puck", Language: "en-US", Gender: "male"},
 		},
 		Profile: Profile{Speed: 1.0, MaxChars: 400},
-		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2", SizeBytes: 349886476},
+		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2", SizeBytes: 349886476, SHA256: "60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4"},
 	},
 	{
 		ID: "piper-es-onnx", Name: "Piper Spanish (ONNX)",

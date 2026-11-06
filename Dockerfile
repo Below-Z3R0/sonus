@@ -6,11 +6,11 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go test ./... \
-    && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/aurisd ./cmd/aurisd \
-    && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/aurisctl ./cmd/aurisctl \
-    && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/voxd ./cmd/voxd \
-    && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/voxctl ./cmd/voxctl
+RUN CGO_ENABLED=1 go test ./... \
+    && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/aurisd ./cmd/aurisd \
+    && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/aurisctl ./cmd/aurisctl \
+    && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/voxd ./cmd/voxd \
+    && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/voxctl ./cmd/voxctl
 
 FROM ${BASE_IMAGE}
 ARG GIT_SHA=dev

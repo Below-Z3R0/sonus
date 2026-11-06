@@ -5,6 +5,8 @@ import (
 	"errors"
 	"runtime/debug"
 	"sync"
+
+	"github.com/Below-Z3R0/sonus/internal/memtrim"
 )
 
 type Status struct {
@@ -78,6 +80,7 @@ func (m *Manager) Unload() {
 	m.state = "not_loaded"
 	m.err = ""
 	debug.FreeOSMemory()
+	memtrim.Trim()
 }
 
 func (m *Manager) Status() Status {

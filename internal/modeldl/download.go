@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -74,9 +75,28 @@ func writeState(root, id string, st State) {
 	_ = os.WriteFile(statePath(root, id), data, 0o644)
 }
 
+// CheckSpace fails before a download that cannot fit in the models volume.
+func CheckSpace(root string, required int64) error {
+	if required <= 0 {
+		return nil
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return err
+	}
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(root, &st); err != nil {
+		return err
+	}
+	free := int64(st.Bavail) * int64(st.Bsize)
+	if free < required {
+		return fmt.Errorf("espacio insuficiente: necesitás %d MB, hay %d MB", required>>20, free>>20)
+	}
+	return nil
+}
+
 // Install downloads one .tar.bz2 archive, reports progress and extracts it
 // under <root>/<id>. Existing installs are left untouched unless force is set.
-func Install(root, id, url string, size int64, sha string, force bool) error {
+func Install(root, id, url string, size int64, sha string, required int64, force bool) error {
 	if !force {
 		if Status(root, id).State == "ready" {
 			return fmt.Errorf("%s ya está instalado (usá --force para reinstalar)", id)
@@ -88,6 +108,9 @@ func Install(root, id, url string, size int64, sha string, force bool) error {
 	}
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
+	}
+	if err := CheckSpace(root, required); err != nil {
+		return fail(root, id, err)
 	}
 	writeState(root, id, State{State: "downloading"})
 

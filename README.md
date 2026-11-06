@@ -75,8 +75,13 @@ piper-es-onnx    fast               missing   2 voices
 - `ready`: instalado y verificado.
 - `failed`: error; `models install --force` reintenta.
 
-`models install` descarga con progreso (`%` y MB), extrae el `.tar.bz2` y escribe `.installed.json`.
-`models remove` borra el modelo del volumen. `service load` rechaza un modelo que no esté `ready`.
+`models install` descarga con progreso (`%` y MB), verifica **SHA-256** cuando el catálogo lo tiene,
+extrae el `.tar.bz2` y escribe `.installed.json`. Antes de descargar chequea espacio libre en el
+volumen. `models remove` borra el modelo. `service load` rechaza un modelo que no esté `ready` y
+verifica RAM disponible contra el presupuesto del modelo.
+
+`voxd --preload` y `aurisd --preload` cargan el default al arrancar. `unload` cierra el modelo,
+libera memoria de Go y llama `malloc_trim` para devolver arenas de glibc al SO.
 
 ## Modelos
 

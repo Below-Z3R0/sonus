@@ -77,7 +77,7 @@ func modelsCmd(args []string) error {
 		if !ok || m.Archive.URL == "" {
 			return fmt.Errorf("%s no tiene descarga", id)
 		}
-		return modeldl.Install(cfg.Paths.Models, id, m.Archive.URL, m.Archive.SizeBytes, m.Archive.SHA256, force)
+		return modeldl.Install(cfg.Paths.Models, id, m.Archive.URL, m.Archive.SizeBytes, m.Archive.SHA256, int64(m.DiskMB)*3*1024*1024/2, force)
 	}
 	remove := func(id string) error { return modeldl.Remove(cfg.Paths.Models, id) }
 	return cliutil.RunModels(args, cfgPath, cfg.Defaults.ASR, rows, show, set, install, remove)

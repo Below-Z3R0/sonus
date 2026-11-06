@@ -37,7 +37,7 @@ var models = []Model{
 		Notes:    "Multilingual ASR; encoder/decoder ONNX export; 4 decoder layers.",
 		RAMMB:    1600, DiskMB: 1200, Languages: 99,
 		Profile: Profile{BeamSize: 5, VAD: true, ChunkSeconds: 30},
-		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-turbo.tar.bz2", SizeBytes: 563790207},
+		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-turbo.tar.bz2", SizeBytes: 563790207, SHA256: "b11acbbcd660b44a8e0df33724feb5aaa709cf65668f2823d59f656312544f22"},
 	},
 	{
 		ID: "whisper-small-onnx", Name: "Whisper small (ONNX)",
