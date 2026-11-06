@@ -9,8 +9,8 @@ Comparte las bases `b3l0w-ort:*` con Argos. Los modelos viven en un volumen, no 
 
 ## Estado
 
-Scaffold funcional: servidores HTTP, CLI, catálogo ONNX y compose. Los motores de inferencia
-(Whisper/Kokoro) todavía no están conectados; los endpoints devuelven `501` hasta la fase 2.
+Scaffold funcional con Vox conectado: `voxd` carga Kokoro ONNX, usa `misakid` como frontend de
+texto y devuelve WAV real en español e inglés. Auris (Whisper) sigue pendiente.
 
 ## Desarrollo
 
@@ -39,6 +39,25 @@ Servicios:
 |---|---|---|
 | auris | http://127.0.0.1:9101 | transcripción |
 | vox | http://127.0.0.1:9102 | síntesis de voz |
+| misakid | interno :9200 | frontend de texto para Kokoro |
+
+## Sintetizar voz
+
+```bash
+voxctl speak "Hola, esto es una prueba." --out hola.wav
+voxctl speak "Hello, this is a test." --out hello.wav
+voxctl speak "Hola" --lang en --out forzado.wav
+voxctl speak "texto largo" --file texto.txt --out texto.wav
+```
+
+`--lang` es `auto` por defecto: `voxd` detecta español o inglés en el texto y elige la voz del preset.
+`--voice` permite forzar una voz concreta.
+
+`voxd` usa Kokoro; `misakid` convierte el texto a fonemas con el frontend oficial de Kokoro
+(misaki; para español, `misaki.espeak` con espeak-ng). El WAV sale a 24 kHz, 16 bit, mono.
+
+Voces Kokoro incluidas en el preset: `em_santa` (es, sid 53), `ef_dora` (es, sid 28),
+`em_alex` (es, sid 29), `af_heart` (en-US, sid 3), `am_puck` (en-US, sid 18).
 
 ## Ciclo de vida del modelo
 
@@ -101,8 +120,8 @@ Catálogos separados, como Argos:
 `models use <id>` cambia el default y lo guarda en `~/.config/sonus/config.yaml`; el servicio lo
 carga al reiniciar. Los modelos no están en la imagen: van al volumen y se gestionan por CLI.
 
-Kokoro es el default de Vox; incluye voces españolas (`ef_dora`, `em_alex`). Piper queda como
-fallback liviano.
+Kokoro es el default de Vox; incluye voces españolas (`ef_dora`, `em_alex`, `em_santa`). Piper queda
+como fallback liviano.
 
 ## Plan
 

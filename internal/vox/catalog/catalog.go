@@ -6,11 +6,20 @@ type Voice struct {
 	ID       string `json:"id"`
 	Language string `json:"language"`
 	Gender   string `json:"gender"`
+	SID      int    `json:"sid"`
 }
 
 type Profile struct {
 	Speed    float64 `json:"speed"`
 	MaxChars int     `json:"max_chars"`
+}
+
+// Frontend describes the text frontend a model needs before inference.
+// PhonemeFormat is the token contract the engine expects.
+type Frontend struct {
+	Type          string `json:"type"`
+	PhonemeFormat string `json:"phoneme_format"`
+	Fallback      string `json:"fallback,omitempty"`
 }
 
 type Archive struct {
@@ -20,19 +29,21 @@ type Archive struct {
 }
 
 type Model struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Tier      string  `json:"tier"`
-	Default   bool    `json:"default"`
-	License   string  `json:"license"`
-	Homepage  string  `json:"homepage"`
-	Notes     string  `json:"notes"`
-	RAMMB     int     `json:"ram_mb"`
-	DiskMB    int     `json:"disk_mb"`
-	Languages int     `json:"languages"`
-	Voices    []Voice `json:"voices"`
-	Profile   Profile `json:"profile"`
-	Archive   Archive `json:"archive"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Tier          string   `json:"tier"`
+	Default       bool     `json:"default"`
+	License       string   `json:"license"`
+	Homepage      string   `json:"homepage"`
+	Notes         string   `json:"notes"`
+	RAMMB         int      `json:"ram_mb"`
+	DiskMB        int      `json:"disk_mb"`
+	Languages     int      `json:"languages"`
+	LanguageCodes []string `json:"language_codes"`
+	Frontend      Frontend `json:"frontend"`
+	Voices        []Voice  `json:"voices"`
+	Profile       Profile  `json:"profile"`
+	Archive       Archive  `json:"archive"`
 }
 
 var models = []Model{
@@ -42,11 +53,14 @@ var models = []Model{
 		Homepage: "https://huggingface.co/hexgrad/Kokoro-82M",
 		Notes:    "82M parameters, 54 voices, 8 languages including Spanish; CPU-friendly.",
 		RAMMB:    400, DiskMB: 350, Languages: 8,
+		LanguageCodes: []string{"en", "es"},
+		Frontend:      Frontend{Type: "misaki", PhonemeFormat: "kokoro", Fallback: "espeak"},
 		Voices: []Voice{
-			{ID: "ef_dora", Language: "es", Gender: "female"},
-			{ID: "em_alex", Language: "es", Gender: "male"},
-			{ID: "af_heart", Language: "en-US", Gender: "female"},
-			{ID: "am_puck", Language: "en-US", Gender: "male"},
+			{ID: "ef_dora", Language: "es", Gender: "female", SID: 28},
+			{ID: "em_alex", Language: "es", Gender: "male", SID: 29},
+			{ID: "em_santa", Language: "es", Gender: "male", SID: 53},
+			{ID: "af_heart", Language: "en-US", Gender: "female", SID: 3},
+			{ID: "am_puck", Language: "en-US", Gender: "male", SID: 18},
 		},
 		Profile: Profile{Speed: 1.0, MaxChars: 400},
 		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2", SizeBytes: 349886476, SHA256: "60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4"},
@@ -57,9 +71,11 @@ var models = []Model{
 		Homepage: "https://github.com/OHF-Voice/piper1-gpl",
 		Notes:    "Very light Spanish voices; fallback for edge and CPU-only hosts.",
 		RAMMB:    300, DiskMB: 120, Languages: 1,
+		LanguageCodes: []string{"es"},
+		Frontend:      Frontend{Type: "piper_phonemize", PhonemeFormat: "piper"},
 		Voices: []Voice{
-			{ID: "es_ES-davefx-medium", Language: "es-ES", Gender: "male"},
-			{ID: "es_ES-sharvard-medium", Language: "es-ES", Gender: "male"},
+			{ID: "es_ES-davefx-medium", Language: "es-ES", Gender: "male", SID: 0},
+			{ID: "es_ES-sharvard-medium", Language: "es-ES", Gender: "male", SID: 1},
 		},
 		Profile: Profile{Speed: 1.0, MaxChars: 300},
 	},

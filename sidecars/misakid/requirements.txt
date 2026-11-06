@@ -1,0 +1,6 @@
+misaki==0.9.4
+espeakng-loader
+phonemizer-fork
+fastapi
+uvicorn[standard]
+pydantic

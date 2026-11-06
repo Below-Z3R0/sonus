@@ -1,4 +1,17 @@
 services:
+  misakid:
+    image: ghcr.io/below-z3r0/misakid:1
+    build: ./sidecars/misakid
+    restart: unless-stopped
+    expose:
+      - "9200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9200/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   auris:
     image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
     command: ["aurisd", "--addr", "0.0.0.0:9101"]
@@ -23,6 +36,9 @@ services:
     image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
     command: ["voxd", "--addr", "0.0.0.0:9102"]
     restart: unless-stopped
+    depends_on:
+      misakid:
+        condition: service_healthy
     ports:
       - "127.0.0.1:9102:9102"
     volumes:
@@ -32,6 +48,7 @@ services:
     environment:
       SONUS_MODELS_DIR: /models
       SONUS_DATA_DIR: /data
+      SONUS_PHONEMIZER_URL: http://misakid:9200
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9102/healthz"]
       interval: 30s

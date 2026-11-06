@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -9,10 +10,10 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/api"
 	"github.com/Below-Z3R0/sonus/internal/config"
 	"github.com/Below-Z3R0/sonus/internal/meminfo"
-	"github.com/Below-Z3R0/sonus/internal/memtrim"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
 	"github.com/Below-Z3R0/sonus/internal/runtime"
 	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
+	voxengine "github.com/Below-Z3R0/sonus/internal/vox/engine"
 )
 
 const version = "0.1.0"
@@ -31,6 +32,7 @@ func main() {
 		model = m
 	}
 
+	eng := voxengine.New(cfg.Paths.Models, cfg.Services.Phonemizer)
 	mgr := runtime.New("vox", version, model.ID, func(id string) error {
 		if st := modeldl.Status(cfg.Paths.Models, id); st.State != "ready" {
 			return fmt.Errorf("%s no está instalado", id)
@@ -40,12 +42,35 @@ func main() {
 				return err
 			}
 		}
-		return fmt.Errorf("engine not wired: Kokoro ONNX pendiente")
-	}, func() { memtrim.Trim() })
+		return eng.Load(id)
+	}, eng.Unload)
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
-	mux.HandleFunc("/v1/speech", func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "speech engine not wired yet", http.StatusNotImplemented)
+	mux.HandleFunc("/v1/speech", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			Text  string `json:"text"`
+			Lang  string `json:"lang"`
+			Voice string `json:"voice"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.Lang == "" {
+			req.Lang = "auto"
+		}
+		wav, err := eng.Speak(r.Context(), req.Text, req.Lang, req.Voice)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/wav")
+		w.Header().Set("Content-Length", fmt.Sprint(len(wav)))
+		_, _ = w.Write(wav)
 	})
 	mux.HandleFunc("/v1/voices", func(w http.ResponseWriter, _ *http.Request) {
 		api.WriteJSON(w, model.Voices)

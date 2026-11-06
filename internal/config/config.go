@@ -21,10 +21,15 @@ type Defaults struct {
 	TTS string `yaml:"tts"`
 }
 
+type Services struct {
+	Phonemizer string `yaml:"phonemizer"`
+}
+
 type Config struct {
 	Variant  string   `yaml:"variant"`
 	Paths    Paths    `yaml:"paths"`
 	Defaults Defaults `yaml:"defaults"`
+	Services Services `yaml:"services"`
 }
 
 func home() string {
@@ -45,6 +50,7 @@ func Default() Config {
 			Output: envOr("SONUS_OUTPUT", filepath.Join(base, "output")),
 		},
 		Defaults: Defaults{ASR: "whisper-turbo-onnx", TTS: "kokoro-82m-onnx"},
+		Services: Services{Phonemizer: envOr("SONUS_PHONEMIZER_URL", "http://127.0.0.1:9200")},
 	}
 }
 

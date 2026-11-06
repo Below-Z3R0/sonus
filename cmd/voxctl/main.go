@@ -53,7 +53,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--voice V] [--out F]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--lang es] [--voice V] [--out F]")
 }
 
 func voicesCmd() error {
@@ -107,11 +107,13 @@ func speakCmd(base string, args []string) error {
 	fs := flag.NewFlagSet("speak", flag.ContinueOnError)
 	file := fs.String("file", "", "read text from a file")
 	out := fs.String("out", "", "output audio file")
-	voice := fs.String("voice", "ef_dora", "voice id")
+	voice := fs.String("voice", "", "voice id (default: model voice for lang)")
+	lang := fs.String("lang", "auto", "language code (auto, es, en, ...)")
 	flags, positional := cliutil.SplitFlags(args, map[string]bool{
 		"--file": true, "-file": true,
 		"--out": true, "-out": true,
 		"--voice": true, "-voice": true,
+		"--lang": true, "-lang": true,
 	})
 	if err := fs.Parse(flags); err != nil {
 		return err
@@ -130,11 +132,11 @@ func speakCmd(base string, args []string) error {
 	if text == "" {
 		return fmt.Errorf("uso: voxctl speak \"texto\" | --file archivo")
 	}
-	return speak(base, text, *voice, *out)
+	return speak(base, text, *lang, *voice, *out)
 }
 
-func speak(base, text, voice, out string) error {
-	body, err := json.Marshal(map[string]string{"text": text, "voice": voice})
+func speak(base, text, lang, voice, out string) error {
+	body, err := json.Marshal(map[string]string{"text": text, "lang": lang, "voice": voice})
 	if err != nil {
 		return err
 	}
