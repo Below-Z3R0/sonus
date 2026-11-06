@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/Below-Z3R0/sonus/internal/config"
-	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Below-Z3R0/sonus/internal/cliutil"
+	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 )
 
 const version = "0.1.0"
@@ -25,43 +27,24 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+	var err error
 	switch os.Args[1] {
 	case "version":
 		fmt.Println(version)
 	case "status":
-		get(base + "/v1/status")
+		err = cliutil.PrintGet(base+"/v1/status", 10*time.Second)
 	case "voices":
-		cfg, _ := config.Load(config.FilePath())
-		model := catalog.Default()
-		if m, ok := catalog.Get(cfg.Defaults.TTS); ok {
-			model = m
-		}
-		out, _ := json.MarshalIndent(model.Voices, "", "  ")
-		fmt.Println(string(out))
+		err = voicesCmd()
 	case "models":
-		modelsCmd(os.Args[2:])
+		err = modelsCmd(os.Args[2:])
 	case "speak":
-		fs := flag.NewFlagSet("speak", flag.ExitOnError)
-		file := fs.String("file", "", "read text from a file")
-		out := fs.String("out", "", "output audio file")
-		voice := fs.String("voice", "ef_dora", "voice id")
-		_ = fs.Parse(os.Args[2:])
-		text := fs.Arg(0)
-		if *file != "" {
-			raw, err := os.ReadFile(*file)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-			text = string(raw)
-		}
-		if text == "" {
-			fmt.Fprintln(os.Stderr, "uso: voxctl speak \"texto\" | --file archivo")
-			os.Exit(1)
-		}
-		speak(base, text, *voice, *out)
+		err = speakCmd(base, os.Args[2:])
 	default:
 		usage()
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -70,96 +53,101 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "voxctl version|status|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--voice V] [--out F]")
 }
 
-func modelsCmd(args []string) {
+func voicesCmd() error {
+	cfg, err := config.Load(config.FilePath())
+	if err != nil {
+		return err
+	}
+	model := catalog.Default()
+	if m, ok := catalog.Get(cfg.Defaults.TTS); ok {
+		model = m
+	}
+	out, err := json.MarshalIndent(model.Voices, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(out))
+	return nil
+}
+
+func modelsCmd(args []string) error {
 	cfgPath := config.FilePath()
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
-	if len(args) == 0 || args[0] == "list" {
-		fmt.Println("ID	TIER	DEFAULT	VOICES")
-		for _, m := range catalog.List() {
-			def := ""
-			if m.ID == cfg.Defaults.TTS {
-				def = "*"
-			}
-			fmt.Printf("%s	%s	%s	%d\n", m.ID, m.Tier, def, len(m.Voices))
-		}
-		return
+	rows := make([]cliutil.ModelRow, 0, len(catalog.List()))
+	for _, m := range catalog.List() {
+		rows = append(rows, cliutil.ModelRow{
+			ID: m.ID, Tier: m.Tier, Extra: fmt.Sprintf("%d voices", len(m.Voices)),
+		})
 	}
-	switch args[0] {
-	case "show":
-		if len(args) != 2 {
-			fmt.Fprintln(os.Stderr, "uso: voxctl models show <id>")
-			os.Exit(1)
-		}
-		m, ok := catalog.Get(args[1])
-		if !ok {
-			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
-			os.Exit(1)
-		}
-		out, _ := json.MarshalIndent(m, "", "  ")
-		fmt.Println(string(out))
-	case "use":
-		if len(args) != 2 {
-			fmt.Fprintln(os.Stderr, "uso: voxctl models use <id>")
-			os.Exit(1)
-		}
-		if _, ok := catalog.Get(args[1]); !ok {
-			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
-			os.Exit(1)
-		}
-		cfg.Defaults.TTS = args[1]
-		if err := cfg.Save(cfgPath); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		fmt.Printf("Vox default = %s (reiniciá el servicio para cargarlo)\n", args[1])
-	default:
-		usage()
-		os.Exit(1)
+	show := func(id string) (any, bool) {
+		m, ok := catalog.Get(id)
+		return m, ok
 	}
+	set := func(c *config.Config, id string) { c.Defaults.TTS = id }
+	return cliutil.RunModels(args, cfgPath, cfg.Defaults.TTS, rows, show, set)
 }
 
-func get(url string) {
-	resp, err := http.Get(url)
+func speakCmd(base string, args []string) error {
+	fs := flag.NewFlagSet("speak", flag.ContinueOnError)
+	file := fs.String("file", "", "read text from a file")
+	out := fs.String("out", "", "output audio file")
+	voice := fs.String("voice", "ef_dora", "voice id")
+	flags, positional := cliutil.SplitFlags(args, map[string]bool{
+		"--file": true, "-file": true,
+		"--out": true, "-out": true,
+		"--voice": true, "-voice": true,
+	})
+	if err := fs.Parse(flags); err != nil {
+		return err
+	}
+	text := ""
+	if len(positional) > 0 {
+		text = positional[0]
+	}
+	if *file != "" {
+		raw, err := os.ReadFile(*file)
+		if err != nil {
+			return err
+		}
+		text = string(raw)
+	}
+	if text == "" {
+		return fmt.Errorf("uso: voxctl speak \"texto\" | --file archivo")
+	}
+	return speak(base, text, *voice, *out)
+}
+
+func speak(base, text, voice, out string) error {
+	body, err := json.Marshal(map[string]string{"text": text, "voice": voice})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
-	defer resp.Body.Close()
-	io.Copy(os.Stdout, resp.Body)
-	fmt.Println()
-}
-
-func speak(base, text, voice, out string) {
-	body, _ := json.Marshal(map[string]string{"text": text, "voice": voice})
 	req, err := http.NewRequest(http.MethodPost, base+"/v1/speech", bytes.NewReader(body))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 2 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
-		fmt.Fprintln(os.Stderr, string(raw))
-		os.Exit(1)
+		return fmt.Errorf("vox: %s: %s", resp.Status, string(raw))
 	}
 	if out == "" {
-		fmt.Fprintln(os.Stderr, "audio listo (sin --out no se guarda todavía)")
-		return
+		return fmt.Errorf("sin --out: el motor todavía no reproduce audio")
 	}
-	_ = os.MkdirAll(filepath.Dir(out), 0o755)
-	if err := os.WriteFile(out, raw, 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return err
 	}
+	return os.WriteFile(out, raw, 0o644)
 }

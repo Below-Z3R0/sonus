@@ -2,17 +2,18 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
-	"github.com/Below-Z3R0/sonus/internal/config"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
+	"github.com/Below-Z3R0/sonus/internal/cliutil"
+	"github.com/Below-Z3R0/sonus/internal/config"
 )
 
 const version = "0.1.0"
@@ -26,24 +27,22 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+	var err error
 	switch os.Args[1] {
 	case "version":
 		fmt.Println(version)
 	case "status":
-		get(base + "/v1/status")
+		err = cliutil.PrintGet(base+"/v1/status", 10*time.Second)
 	case "models":
-		modelsCmd(os.Args[2:])
+		err = modelsCmd(os.Args[2:])
 	case "transcribe":
-		fs := flag.NewFlagSet("transcribe", flag.ExitOnError)
-		out := fs.String("out", "", "output file (empty = stdout)")
-		_ = fs.Parse(os.Args[2:])
-		if fs.NArg() != 1 {
-			fmt.Fprintln(os.Stderr, "uso: aurisctl transcribe <archivo> [--out DIR]")
-			os.Exit(1)
-		}
-		transcribe(base, fs.Arg(0), *out)
+		err = transcribeCmd(base, os.Args[2:])
 	default:
 		usage()
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -52,111 +51,87 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "aurisctl version|status|models list|show <id>|use <id>|transcribe <archivo> [--out DIR]")
 }
 
-func modelsCmd(args []string) {
+func modelsCmd(args []string) error {
 	cfgPath := config.FilePath()
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
-	if len(args) == 0 || args[0] == "list" {
-		fmt.Println("ID	TIER	DEFAULT")
-		for _, m := range catalog.List() {
-			def := ""
-			if m.ID == cfg.Defaults.ASR {
-				def = "*"
-			}
-			fmt.Printf("%s	%s	%s\n", m.ID, m.Tier, def)
-		}
-		return
+	rows := make([]cliutil.ModelRow, 0, len(catalog.List()))
+	for _, m := range catalog.List() {
+		rows = append(rows, cliutil.ModelRow{ID: m.ID, Tier: m.Tier})
 	}
-	switch args[0] {
-	case "show":
-		if len(args) != 2 {
-			fmt.Fprintln(os.Stderr, "uso: aurisctl models show <id>")
-			os.Exit(1)
-		}
-		m, ok := catalog.Get(args[1])
-		if !ok {
-			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
-			os.Exit(1)
-		}
-		out, _ := json.MarshalIndent(m, "", "  ")
-		fmt.Println(string(out))
-	case "use":
-		if len(args) != 2 {
-			fmt.Fprintln(os.Stderr, "uso: aurisctl models use <id>")
-			os.Exit(1)
-		}
-		if _, ok := catalog.Get(args[1]); !ok {
-			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
-			os.Exit(1)
-		}
-		cfg.Defaults.ASR = args[1]
-		if err := cfg.Save(cfgPath); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		fmt.Printf("Auris default = %s (reiniciá el servicio para cargarlo)\n", args[1])
-	default:
-		usage()
-		os.Exit(1)
+	show := func(id string) (any, bool) {
+		m, ok := catalog.Get(id)
+		return m, ok
 	}
+	set := func(c *config.Config, id string) { c.Defaults.ASR = id }
+	return cliutil.RunModels(args, cfgPath, cfg.Defaults.ASR, rows, show, set)
 }
 
-func get(url string) {
-	resp, err := http.Get(url)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+func transcribeCmd(base string, args []string) error {
+	fs := flag.NewFlagSet("transcribe", flag.ContinueOnError)
+	out := fs.String("out", "", "output directory")
+	flags, positional := cliutil.SplitFlags(args, map[string]bool{"--out": true, "-out": true})
+	if err := fs.Parse(flags); err != nil {
+		return err
 	}
-	defer resp.Body.Close()
-	io.Copy(os.Stdout, resp.Body)
-	fmt.Println()
+	if len(positional) != 1 {
+		return fmt.Errorf("uso: aurisctl transcribe <archivo> [--out DIR]")
+	}
+	return transcribe(base, positional[0], *out)
 }
 
-func transcribe(base, path, out string) {
+func transcribe(base, path, out string) error {
 	f, err := os.Open(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	defer f.Close()
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 	part, err := mw.CreateFormFile("audio", filepath.Base(path))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	if _, err := io.Copy(part, f); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
-	mw.Close()
+	if err := mw.Close(); err != nil {
+		return err
+	}
 	req, err := http.NewRequest(http.MethodPost, base+"/v1/transcribe", &body)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if out != "" {
-		_ = os.MkdirAll(out, 0o755)
-		name := filepath.Join(out, filepath.Base(path)+".txt")
-		_ = os.WriteFile(name, raw, 0o644)
-		fmt.Println(name)
-		return
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	if err != nil {
+		return err
 	}
-	os.Stdout.Write(raw)
-	if len(raw) > 0 && raw[len(raw)-1] != '\n' {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("auris: %s: %s", resp.Status, string(raw))
+	}
+	if out != "" {
+		if err := os.MkdirAll(out, 0o755); err != nil {
+			return err
+		}
+		name := filepath.Join(out, filepath.Base(path)+".txt")
+		if err := os.WriteFile(name, raw, 0o644); err != nil {
+			return err
+		}
+		fmt.Println(name)
+		return nil
+	}
+	_, err = os.Stdout.Write(raw)
+	if err == nil && len(raw) > 0 && raw[len(raw)-1] != '\n' {
 		fmt.Println()
 	}
+	return err
 }

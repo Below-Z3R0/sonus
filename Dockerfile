@@ -3,7 +3,8 @@ ARG BASE_IMAGE=ghcr.io/below-z3r0/b3l0w-ort:cpu-1.31
 
 FROM golang:1.27-bookworm AS build
 WORKDIR /src
-COPY go.mod ./
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go test ./... \
     && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/aurisd ./cmd/aurisd \
