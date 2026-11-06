@@ -42,6 +42,23 @@ Servicios:
 | misakid | interno :9200 | frontend de texto para Kokoro |
 | stream | http://127.0.0.1:9103 | ASR streaming por WebSocket |
 
+### Volúmenes
+
+Todo el estado vive bajo una sola raíz, `~/Services/sonus`:
+
+| Host | Contenedor | Contenido |
+|---|---|---|
+| `~/Services/sonus/models` | `/models` | Modelos (Kokoro, Whisper, Kroko, VAD) |
+| `~/Services/sonus/data` | `/data` | Journal de jobs, uploads |
+| `~/Services/sonus/output` | `/output` | WAV generados |
+
+La raíz se cambia con `SONUS_HOME` en `.env`; `SONUS_MODELS_DIR`, `SONUS_DATA_DIR` y
+`SONUS_OUTPUT` pisan rutas individuales. Los CLIs muestran dónde quedó cada una:
+
+```bash
+voxctl paths
+```
+
 ## Auris Stream
 
 Componente separado para micrófono en vivo. No usa Whisper offline: usa un Zipformer2 transducer
