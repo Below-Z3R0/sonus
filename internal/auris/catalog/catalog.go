@@ -46,7 +46,7 @@ var models = []Model{
 		Notes:    "CPU fallback; lower memory and latency.",
 		RAMMB:    600, DiskMB: 500, Languages: 99,
 		Profile: Profile{BeamSize: 3, VAD: true, ChunkSeconds: 30},
-		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2", SizeBytes: 639387718},
+		Archive: Archive{URL: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2", SizeBytes: 639387718, SHA256: "486a46afbb7ba798507190ffe02fea2dd726049af212e774537efac6afb210a6"},
 	},
 }
 
