@@ -100,8 +100,10 @@ modelo nuevo es **Whisper-Streaming**.
 Medición inicial con el fixture `testdata/stream-es.wav`:
 
 - `kroko-es-64l`: devuelve `Hola, esto es una` (parcial/final); es el default.
-- `kroko-es-128l`: carga correctamente, pero con el mismo fixture no devolvió texto. Queda como
-  modelo a validar antes de cambiar el default; no se promueve por la etiqueta “accurate”.
+- `kroko-es-128l`: carga, pero no devuelve texto. El encoder 128L espera `x=[N,269,80]` y metadata
+  `T=269`/`decode_chunk_len=256`; el 64L espera `[N,141,80]`. La documentación de audio.cpp confirma
+  los dos layouts públicos (`141/128` y `269/256`). El runtime Go actual no adapta el chunk a 269,
+  así que el 128L no es usable con esta versión de sherpa; no se cambia el default.
 
 ## Referencias
 
