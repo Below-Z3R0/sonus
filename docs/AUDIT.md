@@ -80,6 +80,22 @@ Revisado en `cmd/`, `internal/` y los tests:
 12. **Observabilidad de jobs**: quién los creó, duración por fase, último error; hoy sólo estado y
     resultado.
 
+### Modelos locales para ASR streaming
+
+"Online" en sherpa-onnx significa **streaming**, no nube. Todos corren en la máquina con ONNX Runtime:
+
+| Modelo | Licencia | Tamaño | Notas |
+|---|---|---|---|
+| Kroko ES 64L / 128L (`hudaiapa88/sherpa-stt-onnx`, `es/kroko_*`) | Apache-2.0 | 147 MB int8 | Zipformer2 transducer, 3 archivos + tokens; recomendado para probar |
+| `csukuangfj/sherpa-onnx-streaming-zipformer-es-kroko-2025-08-06` | sin licencia explícita en la card | 155 MB encoder | Mismo origen Kroko; verificar licencia antes de publicar |
+| `bookbot/sherpa-onnx-zipformer-streaming-robust-es-v0` | Apache-2.0 | ONNX | Salida en fonemas IPA; necesita texto/lexicón, no es plug-and-play |
+| `bookbot/sherpa-onnx-ort-zipformer-streaming-robust-es-v1` | CC-BY-NC-SA-3.0 | ORT | No comercial; `.ort`, no el formato estándar |
+| Vosk español | Apache-2.0 | variable | Streaming real, pero otro runtime (no sherpa/ORT) |
+| Whisper-Streaming + VAD | MIT (Whisper) | el Whisper actual | ~3–5 s de latencia; reutiliza el modelo sin agregar otro |
+
+La opción de menor fricción para Sonus es **Kroko ES 64L/128L** con `OnlineRecognizer`; la de menor
+modelo nuevo es **Whisper-Streaming**.
+
 ## Referencias
 
 - Whisper long audio: chunking 20–30 s, overlap 2–3 s, VAD y deduplicación.
