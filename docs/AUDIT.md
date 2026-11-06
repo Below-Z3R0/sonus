@@ -12,8 +12,10 @@ Estado después de conectar Kokoro, Whisper, jobs, MCP y configuración.
 | Un modelo residente; load/unload sin reiniciar | sí | sí |
 | Texto largo / audio largo | troceo por caracteres | ventanas de 30 s |
 | Idioma | detección por fragmento | Whisper detecta |
-| Jobs en memoria | sí (50) | sí (50) |
+| Jobs en memoria | sí (journal en disco) | sí (journal en disco) |
 | SSE | `/v1/jobs/{id}/events` | igual |
+| Streaming TTS | PCM16 por frase | no aplica |
+| Streaming ASR | pendiente | pendiente |
 | MCP | `vox_*` | `auris_*` |
 | Config get/set/reset | sí | sí |
 | Doctor y métricas | sí | sí |
@@ -49,13 +51,11 @@ Revisado en `cmd/`, `internal/` y los tests:
    es VAD (Silero) y 2–3 s de overlap con deduplicación de texto; el corte fijo puede partir palabras
    y perder contexto. Investigación: SayToWords, guías de chunking de Whisper (20–30 s batch,
    2–3 s overlap, VAD).
-2. **Streaming real.** Los jobs son en memoria y devuelven el resultado al final. Para conversación
-   hace falta streaming de audio (TTS) y parciales (ASR), no sólo SSE de estado.
-3. **Persistencia de jobs.** Un reinicio pierde la cola. Si el trabajo debe sobrevivir, persistir
-   estado/resultado en disco o en SQLite.
-4. **Concurrencia del motor.** `Engine.Speak` y `Engine.Transcribe` serializan todo con un mutex: es
-   correcto para una sola GPU/CPU y evita OOM, pero un job largo bloquea a los demás. Medir y, si
-   hace falta, un pool de sesiones o límite de cola explícito.
+2. **Streaming ASR real.** Vox ya manda PCM16 por frase; Auris sigue siendo offline por ventana.
+   Para hablar y ver texto mientras hablás hace falta un modelo online (Zipformer) o
+   Whisper-Streaming con VAD y LocalAgreement; el Whisper offline actual no alcanza.
+3. **Concurrencia del motor.** `Engine.Speak` y `Engine.Transcribe` serializan todo con un mutex:
+   evita OOM, pero un job largo bloquea a los demás. Medir y decidir pool o límite de cola.
 
 ### Prioridad media
 
