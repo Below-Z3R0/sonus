@@ -18,6 +18,7 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/cliutil"
 	"github.com/Below-Z3R0/sonus/internal/config"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
+	voxcatalog "github.com/Below-Z3R0/sonus/internal/vox/catalog"
 )
 
 const version = "0.1.0"
@@ -100,6 +101,10 @@ func configCmd(args []string) error {
 		case "defaults.asr":
 			if _, ok := catalog.Get(value); !ok {
 				return fmt.Errorf("modelo ASR desconocido: %s", value)
+			}
+		case "defaults.tts":
+			if _, ok := voxcatalog.Get(value); !ok {
+				return fmt.Errorf("modelo TTS desconocido: %s", value)
 			}
 		case "paths.models", "paths.data", "paths.media", "paths.output", "services.phonemizer":
 			if value == "" {

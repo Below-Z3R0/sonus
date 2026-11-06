@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	auriscatalog "github.com/Below-Z3R0/sonus/internal/auris/catalog"
 	"github.com/Below-Z3R0/sonus/internal/cliutil"
 	"github.com/Below-Z3R0/sonus/internal/config"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
@@ -87,6 +88,10 @@ func configCmd(args []string) error {
 		case "defaults.tts":
 			if _, ok := catalog.Get(value); !ok {
 				return fmt.Errorf("modelo TTS desconocido: %s", value)
+			}
+		case "defaults.asr":
+			if _, ok := auriscatalog.Get(value); !ok {
+				return fmt.Errorf("modelo ASR desconocido: %s", value)
 			}
 		case "paths.models", "paths.data", "paths.media", "paths.output", "services.phonemizer":
 			if value == "" {
