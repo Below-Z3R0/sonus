@@ -190,4 +190,4 @@ como fallback liviano.
 
 ## Plan
 
-Ver [`docs/PLAN.md`](docs/PLAN.md).
+Ver [`docs/PLAN.md`](docs/PLAN.md) y la auditoría de gaps en [`docs/AUDIT.md`](docs/AUDIT.md).
