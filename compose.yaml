@@ -39,8 +39,8 @@ services:
     ports:
       - "127.0.0.1:9103:9103"
     volumes:
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/models:/models
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/data:/data
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/models:/models
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/data:/data
     environment:
       SONUS_MODELS_DIR: /models
       SONUS_DATA_DIR: /data
@@ -58,8 +58,8 @@ services:
     ports:
       - "127.0.0.1:9101:9101"
     volumes:
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/models:/models
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/data:/data
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/models:/models
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/data:/data
       - ${SONUS_MEDIA:-${HOME}/Media}:/media:ro
     environment:
       SONUS_MODELS_DIR: /models
@@ -81,9 +81,9 @@ services:
     ports:
       - "127.0.0.1:9102:9102"
     volumes:
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/models:/models
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/data:/data
-      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/output:/output
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/models:/models
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/data:/data
+      - ${SONUS_HOME:-${HOME}/Services/sonus}/output:/output
     environment:
       SONUS_MODELS_DIR: /models
       SONUS_DATA_DIR: /data

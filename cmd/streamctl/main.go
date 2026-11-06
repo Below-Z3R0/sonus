@@ -38,6 +38,8 @@ func main() {
 		err = vadCmd(os.Args[2:])
 	case "config":
 		err = configCmd(os.Args[2:])
+	case "paths":
+		err = cliutil.PathsCmd()
 	case "service":
 		err = cliutil.Service(base, os.Args[2:])
 	case "stream":
@@ -55,7 +57,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|vad status|install|config get|set|reset|stream <archivo.wav>|listen [--device D] [--backend auto|parec|arecord] [--threshold N] [--silence-ms N] [--seconds N]")
+	fmt.Fprintln(os.Stderr, "streamctl version|status|paths|service status|load <model>|unload|models list|show <id>|use <id>|vad status|install|config get|set|reset|stream <archivo.wav>|listen [--device D] [--backend auto|parec|arecord] [--threshold N] [--silence-ms N] [--seconds N]")
 }
 
 func vadCmd(args []string) error {

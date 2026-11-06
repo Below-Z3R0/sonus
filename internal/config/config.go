@@ -40,8 +40,11 @@ func home() string {
 	return "."
 }
 
+// Default returns the built-in paths. All state lives under one root so a
+// backup or wipe is a single directory: SONUS_HOME overrides it, and the
+// per-path variables still win over it.
 func Default() Config {
-	base := filepath.Join(home(), ".local", "share", "sonus")
+	base := envOr("SONUS_HOME", filepath.Join(home(), "Services", "sonus"))
 	return Config{
 		Variant: envOr("SONUS_VARIANT", "cpu"),
 		Paths: Paths{

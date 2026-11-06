@@ -44,6 +44,8 @@ func main() {
 		err = modelsCmd(os.Args[2:])
 	case "config":
 		err = configCmd(os.Args[2:])
+	case "paths":
+		err = cliutil.PathsCmd()
 	case "service":
 		err = cliutil.Service(base, os.Args[2:])
 	case "jobs":
@@ -63,7 +65,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|retry|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]|read")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|paths|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|retry|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]|read")
 }
 
 func voicesCmd() error {
