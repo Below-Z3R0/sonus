@@ -111,6 +111,7 @@ sonus-mcp --addr 127.0.0.1:9201
 
 Tools: `vox_speak`, `vox_status`, `vox_doctor`, `vox_models`, `vox_jobs`, `vox_job`, `vox_load`,
 `vox_unload`, y los equivalentes `auris_*`. `--read-only` oculta las tools de escritura.
+Configuración y contrato completo en [`docs/MCP.md`](docs/MCP.md).
 
 ## Config
 
