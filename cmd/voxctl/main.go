@@ -58,7 +58,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|retry|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]")
 }
 
 func voicesCmd() error {

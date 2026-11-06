@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -83,7 +84,7 @@ func main() {
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
 	api.RegisterMetrics(mux, obs.Snapshot)
-	jm := jobs.New(50)
+	jm := jobs.New(filepath.Join(cfg.Paths.Data, "jobs.json"), 50)
 	api.RegisterJobs(mux, jm)
 	api.RegisterDoctor(mux, func() any {
 		st := mgr.Status()
@@ -93,6 +94,40 @@ func main() {
 			"service": "auris", "status": st,
 			"model_dir": cfg.Paths.Models, "free_mb": free >> 20, "available_ram_mb": ram,
 		}
+	})
+	mux.HandleFunc("/v1/jobs/retry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&req); err != nil || req.ID == "" {
+			http.Error(w, "job id requerido", http.StatusBadRequest)
+			return
+		}
+		old, ok := jm.Get(req.ID)
+		if !ok || old.Kind != "asr" {
+			http.Error(w, "job asr no encontrado", http.StatusNotFound)
+			return
+		}
+		var payload map[string]string
+		if err := json.Unmarshal(old.Payload, &payload); err != nil || payload["path"] == "" {
+			http.Error(w, "payload inválido", http.StatusBadRequest)
+			return
+		}
+		path := payload["path"]
+		if _, err := os.Stat(path); err != nil {
+			http.Error(w, "el audio original ya no existe", http.StatusGone)
+			return
+		}
+		id := jm.Start("asr", payload, r.Context(), func(ctx context.Context) (any, error) {
+			defer os.Remove(path)
+			return eng.Transcribe(ctx, path)
+		})
+		w.WriteHeader(http.StatusAccepted)
+		api.WriteJSON(w, map[string]string{"job_id": id})
 	})
 	mux.HandleFunc("/v1/transcribe", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -122,7 +157,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		id := jm.Start("asr", r.Context(), func(ctx context.Context) (any, error) {
+		id := jm.Start("asr", map[string]string{"path": path}, r.Context(), func(ctx context.Context) (any, error) {
 			defer os.Remove(path)
 			return eng.Transcribe(ctx, path)
 		})

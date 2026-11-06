@@ -59,7 +59,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "aurisctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|transcribe <archivo> [--out DIR] [--async]")
+	fmt.Fprintln(os.Stderr, "aurisctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|retry|transcribe <archivo> [--out DIR] [--async]")
 }
 
 func modelsCmd(args []string) error {

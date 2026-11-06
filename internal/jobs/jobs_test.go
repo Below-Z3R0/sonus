@@ -8,8 +8,8 @@ import (
 )
 
 func TestStart(t *testing.T) {
-	m := New(10)
-	id := m.Start("test", context.Background(), func(context.Context) (any, error) {
+	m := New("", 10)
+	id := m.Start("test", nil, context.Background(), func(context.Context) (any, error) {
 		return "ok", nil
 	})
 	deadline := time.Now().Add(2 * time.Second)
@@ -27,8 +27,8 @@ func TestStart(t *testing.T) {
 }
 
 func TestFailure(t *testing.T) {
-	m := New(10)
-	id := m.Start("test", context.Background(), func(context.Context) (any, error) {
+	m := New("", 10)
+	id := m.Start("test", nil, context.Background(), func(context.Context) (any, error) {
 		return nil, errors.New("boom")
 	})
 	deadline := time.Now().Add(2 * time.Second)
@@ -45,9 +45,9 @@ func TestFailure(t *testing.T) {
 }
 
 func TestBounded(t *testing.T) {
-	m := New(2)
+	m := New("", 2)
 	for i := 0; i < 5; i++ {
-		id := m.Start("test", context.Background(), func(context.Context) (any, error) {
+		id := m.Start("test", nil, context.Background(), func(context.Context) (any, error) {
 			return i, nil
 		})
 		deadline := time.Now().Add(time.Second)

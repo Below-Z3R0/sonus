@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Below-Z3R0/sonus/internal/api"
@@ -116,7 +117,7 @@ func main() {
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
 	api.RegisterMetrics(mux, obs.Snapshot)
-	jm := jobs.New(50)
+	jm := jobs.New(filepath.Join(cfg.Paths.Data, "jobs.json"), 50)
 	api.RegisterJobs(mux, jm)
 	api.RegisterDoctor(mux, func() any {
 		st := mgr.Status()
@@ -161,7 +162,7 @@ func main() {
 		if !ok {
 			return
 		}
-		id := jm.Start("tts", r.Context(), func(ctx context.Context) (any, error) {
+		id := jm.Start("tts", req, r.Context(), func(ctx context.Context) (any, error) {
 			return speakJob(ctx, eng, cfg, req)
 		})
 		w.WriteHeader(http.StatusAccepted)
@@ -195,6 +196,34 @@ func main() {
 		if err != nil {
 			log.Printf("speech stream: %v", err)
 		}
+	})
+	mux.HandleFunc("/v1/jobs/retry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			ID string `json:"id"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&req); err != nil || req.ID == "" {
+			http.Error(w, "job id requerido", http.StatusBadRequest)
+			return
+		}
+		old, ok := jm.Get(req.ID)
+		if !ok || old.Kind != "tts" {
+			http.Error(w, "job tts no encontrado", http.StatusNotFound)
+			return
+		}
+		var sp speechRequest
+		if err := json.Unmarshal(old.Payload, &sp); err != nil {
+			http.Error(w, "payload inválido", http.StatusBadRequest)
+			return
+		}
+		id := jm.Start("tts", sp, r.Context(), func(ctx context.Context) (any, error) {
+			return speakJob(ctx, eng, cfg, sp)
+		})
+		w.WriteHeader(http.StatusAccepted)
+		api.WriteJSON(w, map[string]string{"job_id": id})
 	})
 	mux.HandleFunc("/v1/voices", func(w http.ResponseWriter, _ *http.Request) {
 		api.WriteJSON(w, model.Voices)

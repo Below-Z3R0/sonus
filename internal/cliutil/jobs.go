@@ -1,6 +1,7 @@
 package cliutil
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +30,11 @@ func JobCmd(base string, args []string) error {
 			return fmt.Errorf("uso: jobs status <id>")
 		}
 		return printJob(base, args[1])
+	case "retry":
+		if len(args) != 2 {
+			return fmt.Errorf("uso: jobs retry <id>")
+		}
+		return retryJob(base, args[1])
 	case "wait":
 		if len(args) != 2 {
 			return fmt.Errorf("uso: jobs wait <id>")
@@ -43,6 +49,21 @@ func printJob(base, id string) error {
 	raw, err := Get(base+"/v1/jobs/"+id, 10*time.Second)
 	if err != nil {
 		return err
+	}
+	fmt.Println(string(raw))
+	return nil
+}
+
+func retryJob(base, id string) error {
+	body, _ := json.Marshal(map[string]string{"id": id})
+	resp, err := http.Post(base+"/v1/jobs/retry", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("job: %s: %s", resp.Status, string(raw))
 	}
 	fmt.Println(string(raw))
 	return nil

@@ -50,7 +50,12 @@ voxctl speak "Hola" --lang en --out forzado.wav
 voxctl speak "texto largo" --file texto.txt --out texto.wav
 voxctl speak "texto largo" --async
 voxctl jobs wait <job_id>
+voxctl speak "texto" --stream > audio.pcm
+ffplay -f s16le -ar 24000 -ac 1 audio.pcm
 ```
+
+`--stream` devuelve PCM16 mono a 24 kHz por HTTP (`/v1/speech/stream`), y empieza a escribir audio
+cuando termina el primer fragmento. No espera a sintetizar todo el texto.
 
 `--lang` es `auto` por defecto: `voxd` detecta español o inglés en el texto y elige la voz del preset.
 `--voice` permite forzar una voz concreta. `--async` devuelve un job y el WAV queda en
@@ -101,7 +106,12 @@ aurisctl transcribe audio.wav --async
 voxctl jobs list
 voxctl jobs status <id>
 voxctl jobs wait <id>
+voxctl jobs retry <id>
 ```
+
+El journal se guarda en `~/.local/share/sonus/data/jobs.json`. Al reiniciar, los jobs que estaban
+corriendo quedan `failed` con `interrumpido por reinicio`; `jobs retry` los vuelve a encolar si el
+payload sigue disponible. Para ASR, el WAV original tiene que seguir en disco.
 
 `sonus-mcp` expone ambos servicios por MCP Streamable HTTP:
 
