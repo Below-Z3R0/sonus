@@ -48,10 +48,13 @@ voxctl speak "Hola, esto es una prueba." --out hola.wav
 voxctl speak "Hello, this is a test." --out hello.wav
 voxctl speak "Hola" --lang en --out forzado.wav
 voxctl speak "texto largo" --file texto.txt --out texto.wav
+voxctl speak "texto largo" --async
+voxctl jobs wait <job_id>
 ```
 
 `--lang` es `auto` por defecto: `voxd` detecta español o inglés en el texto y elige la voz del preset.
-`--voice` permite forzar una voz concreta.
+`--voice` permite forzar una voz concreta. `--async` devuelve un job y el WAV queda en
+`~/.local/share/sonus/output/tts-*.wav` (o el directorio configurado).
 
 `voxd` usa Kokoro; `misakid` convierte el texto a fonemas con el frontend oficial de Kokoro
 (misaki; para español, `misaki.espeak` con espeak-ng; para inglés, `misaki.en`). El texto se divide
@@ -68,10 +71,13 @@ aurisctl models install whisper-turbo-onnx
 aurisctl service load whisper-turbo-onnx
 aurisctl transcribe audio.wav
 aurisctl transcribe audio.wav --out transcripciones
+aurisctl transcribe audio.mp3
+aurisctl transcribe audio.wav --async
+aurisctl jobs wait <job_id>
 ```
 
-La entrada es WAV PCM; sherpa remuestrea a 16 kHz y parte audios de más de 30 segundos en bloques.
-La salida es texto plano, con el idioma detectado por Whisper en la respuesta HTTP.
+La entrada puede ser WAV, MP3 u OGG: `aurisctl` convierte a WAV mono 16 kHz con ffmpeg antes de
+subirlo. El servidor parte audios de más de 30 segundos en bloques y devuelve `{text, lang}`.
 
 ## Diagnóstico y métricas
 
@@ -84,6 +90,38 @@ curl -sS http://127.0.0.1:9101/v1/metrics
 
 `doctor` muestra estado del modelo, espacio libre, RAM disponible y, en Vox, salud de `misakid`.
 `metrics` cuenta requests, errores y duración acumulada.
+
+## Jobs y MCP
+
+Las operaciones largas se pueden encolar:
+
+```bash
+voxctl speak "texto largo" --async
+aurisctl transcribe audio.wav --async
+voxctl jobs list
+voxctl jobs status <id>
+voxctl jobs wait <id>
+```
+
+`sonus-mcp` expone ambos servicios por MCP Streamable HTTP:
+
+```bash
+sonus-mcp --addr 127.0.0.1:9201
+```
+
+Tools: `vox_speak`, `vox_status`, `vox_doctor`, `vox_models`, `vox_jobs`, `vox_job`, `vox_load`,
+`vox_unload`, y los equivalentes `auris_*`. `--read-only` oculta las tools de escritura.
+
+## Config
+
+```bash
+voxctl config get defaults.tts
+voxctl config set defaults.tts kokoro-82m-onnx
+voxctl config reset defaults.tts
+aurisctl config get defaults.asr
+```
+
+Claves: `variant`, `paths.*`, `defaults.asr`, `defaults.tts`, `services.phonemizer`.
 
 ## Ciclo de vida del modelo
 

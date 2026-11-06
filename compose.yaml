@@ -12,6 +12,24 @@ services:
       retries: 3
       start_period: 10s
 
+  mcp:
+    image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
+    command: ["sonus-mcp", "--addr", "0.0.0.0:9201", "--vox", "http://vox:9102", "--auris", "http://auris:9101"]
+    restart: unless-stopped
+    depends_on:
+      vox:
+        condition: service_healthy
+      auris:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9201:9201"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9201/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   auris:
     image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
     command: ["aurisd", "--addr", "0.0.0.0:9101"]

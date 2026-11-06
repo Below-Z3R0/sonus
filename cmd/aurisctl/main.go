@@ -9,7 +9,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
@@ -37,8 +39,12 @@ func main() {
 		err = cliutil.PrintGet(base+"/v1/status", 10*time.Second)
 	case "models":
 		err = modelsCmd(os.Args[2:])
+	case "config":
+		err = configCmd(os.Args[2:])
 	case "service":
 		err = cliutil.Service(base, os.Args[2:])
+	case "jobs":
+		err = cliutil.JobCmd(base, os.Args[2:])
 	case "transcribe":
 		err = transcribeCmd(base, os.Args[2:])
 	default:
@@ -52,7 +58,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "aurisctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|transcribe <archivo> [--out DIR]")
+	fmt.Fprintln(os.Stderr, "aurisctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|transcribe <archivo> [--out DIR] [--async]")
 }
 
 func modelsCmd(args []string) error {
@@ -84,9 +90,49 @@ func modelsCmd(args []string) error {
 	return cliutil.RunModels(args, cfgPath, cfg.Defaults.ASR, rows, show, set, install, remove)
 }
 
+func configCmd(args []string) error {
+	validate := func(key, value string) error {
+		switch key {
+		case "variant":
+			if value != "cpu" && value != "cuda" && value != "intel" && value != "amd" {
+				return fmt.Errorf("variant inválida: %s", value)
+			}
+		case "defaults.asr":
+			if _, ok := catalog.Get(value); !ok {
+				return fmt.Errorf("modelo ASR desconocido: %s", value)
+			}
+		case "paths.models", "paths.data", "paths.media", "paths.output", "services.phonemizer":
+			if value == "" {
+				return fmt.Errorf("%s no puede estar vacío", key)
+			}
+		}
+		return nil
+	}
+	return cliutil.ConfigCmd(config.FilePath(), args, validate)
+}
+
+func prepareAudio(path string) (string, func(), error) {
+	if strings.EqualFold(filepath.Ext(path), ".wav") {
+		return path, func() {}, nil
+	}
+	tmp, err := os.CreateTemp("", "auris-*.wav")
+	if err != nil {
+		return "", func() {}, err
+	}
+	name := tmp.Name()
+	tmp.Close()
+	cmd := exec.Command("ffmpeg", "-y", "-i", path, "-ar", "16000", "-ac", "1", "-f", "wav", name)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		os.Remove(name)
+		return "", func() {}, fmt.Errorf("ffmpeg: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return name, func() { os.Remove(name) }, nil
+}
+
 func transcribeCmd(base string, args []string) error {
 	fs := flag.NewFlagSet("transcribe", flag.ContinueOnError)
 	out := fs.String("out", "", "output directory")
+	async := fs.Bool("async", false, "return a job id instead of waiting for text")
 	flags, positional := cliutil.SplitFlags(args, map[string]bool{"--out": true, "-out": true})
 	if err := fs.Parse(flags); err != nil {
 		return err
@@ -94,10 +140,65 @@ func transcribeCmd(base string, args []string) error {
 	if len(positional) != 1 {
 		return fmt.Errorf("uso: aurisctl transcribe <archivo> [--out DIR]")
 	}
+	if *async {
+		return transcribeAsync(base, positional[0])
+	}
 	return transcribe(base, positional[0], *out)
 }
 
+func transcribeAsync(base, path string) error {
+	path, cleanup, err := prepareAudio(path)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, err := mw.CreateFormFile("audio", filepath.Base(path))
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(part, f); err != nil {
+		return err
+	}
+	if err := mw.Close(); err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, base+"/v1/transcribe/jobs", &body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("auris: %s: %s", resp.Status, string(raw))
+	}
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	fmt.Println(out.JobID)
+	return nil
+}
+
 func transcribe(base, path, out string) error {
+	path, cleanup, err := prepareAudio(path)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 	f, err := os.Open(path)
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -13,11 +14,43 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
 	aurisengine "github.com/Below-Z3R0/sonus/internal/auris/engine"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/jobs"
 	"github.com/Below-Z3R0/sonus/internal/meminfo"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
 	"github.com/Below-Z3R0/sonus/internal/obs"
 	"github.com/Below-Z3R0/sonus/internal/runtime"
 )
+
+func saveUpload(w http.ResponseWriter, r *http.Request, dir string) (string, error) {
+	r.Body = http.MaxBytesReader(w, r.Body, 128<<20)
+	if err := r.ParseMultipartForm(128 << 20); err != nil {
+		return "", fmt.Errorf("multipart inválido")
+	}
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		return "", fmt.Errorf("falta el campo audio")
+	}
+	defer file.Close()
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".wav"
+	}
+	tmp, err := os.CreateTemp(dir, "auris-*"+ext)
+	if err != nil {
+		return "", err
+	}
+	name := tmp.Name()
+	if _, err := io.Copy(tmp, file); err != nil {
+		tmp.Close()
+		os.Remove(name)
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return "", err
+	}
+	return name, nil
+}
 
 const version = "0.1.0"
 
@@ -50,6 +83,8 @@ func main() {
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
 	api.RegisterMetrics(mux, obs.Snapshot)
+	jm := jobs.New(50)
+	api.RegisterJobs(mux, jm)
 	api.RegisterDoctor(mux, func() any {
 		st := mgr.Status()
 		free, _ := modeldl.FreeBytes(cfg.Paths.Models)
@@ -64,43 +99,35 @@ func main() {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 128<<20)
-		if err := r.ParseMultipartForm(128 << 20); err != nil {
-			http.Error(w, "multipart inválido", http.StatusBadRequest)
-			return
-		}
-		file, header, err := r.FormFile("audio")
+		path, err := saveUpload(w, r, cfg.Paths.Data)
 		if err != nil {
-			http.Error(w, "falta el campo audio", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-		ext := filepath.Ext(header.Filename)
-		if ext == "" {
-			ext = ".wav"
-		}
-		tmp, err := os.CreateTemp(cfg.Paths.Data, "auris-*"+ext)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		tmpName := tmp.Name()
-		defer os.Remove(tmpName)
-		if _, err := io.Copy(tmp, file); err != nil {
-			tmp.Close()
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := tmp.Close(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		out, err := eng.Transcribe(r.Context(), tmpName)
+		defer os.Remove(path)
+		out, err := eng.Transcribe(r.Context(), path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		api.WriteJSON(w, out)
+	})
+	mux.HandleFunc("/v1/transcribe/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		path, err := saveUpload(w, r, cfg.Paths.Data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		id := jm.Start("asr", r.Context(), func(ctx context.Context) (any, error) {
+			defer os.Remove(path)
+			return eng.Transcribe(ctx, path)
+		})
+		w.WriteHeader(http.StatusAccepted)
+		api.WriteJSON(w, map[string]string{"job_id": id})
 	})
 
 	log.Printf("aurisd %s on %s (model %s)", version, *addr, model.ID)

@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Below-Z3R0/sonus/internal/api"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/jobs"
 	"github.com/Below-Z3R0/sonus/internal/meminfo"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
 	"github.com/Below-Z3R0/sonus/internal/obs"
@@ -18,6 +20,49 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 	voxengine "github.com/Below-Z3R0/sonus/internal/vox/engine"
 )
+
+type speechRequest struct {
+	Text  string `json:"text"`
+	Lang  string `json:"lang"`
+	Voice string `json:"voice"`
+}
+
+func parseSpeech(w http.ResponseWriter, r *http.Request) (speechRequest, bool) {
+	var req speechRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return req, false
+	}
+	if req.Lang == "" {
+		req.Lang = "auto"
+	}
+	return req, true
+}
+
+func speakJob(ctx context.Context, eng *voxengine.Engine, cfg config.Config, req speechRequest) (any, error) {
+	wav, err := eng.Speak(ctx, req.Text, req.Lang, req.Voice)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(cfg.Paths.Output, 0o755); err != nil {
+		return nil, err
+	}
+	f, err := os.CreateTemp(cfg.Paths.Output, "tts-*.wav")
+	if err != nil {
+		return nil, err
+	}
+	name := f.Name()
+	if _, err := f.Write(wav); err != nil {
+		f.Close()
+		os.Remove(name)
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(name)
+		return nil, err
+	}
+	return map[string]any{"path": name, "bytes": len(wav)}, nil
+}
 
 const version = "0.1.0"
 
@@ -50,6 +95,8 @@ func main() {
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
 	api.RegisterMetrics(mux, obs.Snapshot)
+	jm := jobs.New(50)
+	api.RegisterJobs(mux, jm)
 	api.RegisterDoctor(mux, func() any {
 		st := mgr.Status()
 		free, _ := modeldl.FreeBytes(cfg.Paths.Models)
@@ -71,17 +118,9 @@ func main() {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
 			return
 		}
-		var req struct {
-			Text  string `json:"text"`
-			Lang  string `json:"lang"`
-			Voice string `json:"voice"`
-		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON", http.StatusBadRequest)
+		req, ok := parseSpeech(w, r)
+		if !ok {
 			return
-		}
-		if req.Lang == "" {
-			req.Lang = "auto"
 		}
 		wav, err := eng.Speak(r.Context(), req.Text, req.Lang, req.Voice)
 		if err != nil {
@@ -91,6 +130,21 @@ func main() {
 		w.Header().Set("Content-Type", "audio/wav")
 		w.Header().Set("Content-Length", fmt.Sprint(len(wav)))
 		_, _ = w.Write(wav)
+	})
+	mux.HandleFunc("/v1/speech/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		req, ok := parseSpeech(w, r)
+		if !ok {
+			return
+		}
+		id := jm.Start("tts", r.Context(), func(ctx context.Context) (any, error) {
+			return speakJob(ctx, eng, cfg, req)
+		})
+		w.WriteHeader(http.StatusAccepted)
+		api.WriteJSON(w, map[string]string{"job_id": id})
 	})
 	mux.HandleFunc("/v1/voices", func(w http.ResponseWriter, _ *http.Request) {
 		api.WriteJSON(w, model.Voices)

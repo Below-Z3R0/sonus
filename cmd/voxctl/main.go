@@ -38,8 +38,12 @@ func main() {
 		err = voicesCmd()
 	case "models":
 		err = modelsCmd(os.Args[2:])
+	case "config":
+		err = configCmd(os.Args[2:])
 	case "service":
 		err = cliutil.Service(base, os.Args[2:])
+	case "jobs":
+		err = cliutil.JobCmd(base, os.Args[2:])
 	case "speak":
 		err = speakCmd(base, os.Args[2:])
 	default:
@@ -53,7 +57,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--lang es] [--voice V] [--out F]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async]")
 }
 
 func voicesCmd() error {
@@ -71,6 +75,27 @@ func voicesCmd() error {
 	}
 	fmt.Println(string(out))
 	return nil
+}
+
+func configCmd(args []string) error {
+	validate := func(key, value string) error {
+		switch key {
+		case "variant":
+			if value != "cpu" && value != "cuda" && value != "intel" && value != "amd" {
+				return fmt.Errorf("variant inválida: %s", value)
+			}
+		case "defaults.tts":
+			if _, ok := catalog.Get(value); !ok {
+				return fmt.Errorf("modelo TTS desconocido: %s", value)
+			}
+		case "paths.models", "paths.data", "paths.media", "paths.output", "services.phonemizer":
+			if value == "" {
+				return fmt.Errorf("%s no puede estar vacío", key)
+			}
+		}
+		return nil
+	}
+	return cliutil.ConfigCmd(config.FilePath(), args, validate)
 }
 
 func modelsCmd(args []string) error {
@@ -109,6 +134,7 @@ func speakCmd(base string, args []string) error {
 	out := fs.String("out", "", "output audio file")
 	voice := fs.String("voice", "", "voice id (default: model voice for lang)")
 	lang := fs.String("lang", "auto", "language code (auto, es, en, ...)")
+	async := fs.Bool("async", false, "return a job id instead of waiting for audio")
 	flags, positional := cliutil.SplitFlags(args, map[string]bool{
 		"--file": true, "-file": true,
 		"--out": true, "-out": true,
@@ -132,7 +158,34 @@ func speakCmd(base string, args []string) error {
 	if text == "" {
 		return fmt.Errorf("uso: voxctl speak \"texto\" | --file archivo")
 	}
+	if *async {
+		return speakAsync(base, text, *lang, *voice)
+	}
 	return speak(base, text, *lang, *voice, *out)
+}
+
+func speakAsync(base, text, lang, voice string) error {
+	body, err := json.Marshal(map[string]string{"text": text, "lang": lang, "voice": voice})
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(base+"/v1/speech/jobs", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("vox: %s: %s", resp.Status, string(raw))
+	}
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	fmt.Println(out.JobID)
+	return nil
 }
 
 func speak(base, text, lang, voice, out string) error {
