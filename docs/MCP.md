@@ -41,8 +41,8 @@ mcp_servers:
 | `auris_transcribe` | transcribe un WAV del host y devuelve texto |
 | `vox_jobs` / `auris_jobs` | lista de jobs |
 | `vox_job` / `auris_job` | estado/resultado de un job |
-| `vox_load` / `auris_load` | carga un modelo |
-| `vox_unload` / `auris_unload` | libera el residente |
+| `vox_load` / `auris_load` / `stream_load` | carga un modelo |
+| `vox_unload` / `auris_unload` / `stream_unload` | libera el residente |
 
 `--read-only` no registra las tools de escritura.
 

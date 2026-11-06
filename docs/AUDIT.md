@@ -15,7 +15,7 @@ Estado después de conectar Kokoro, Whisper, jobs, MCP y configuración.
 | Jobs en memoria | sí (journal en disco) | sí (journal en disco) |
 | SSE | `/v1/jobs/{id}/events` | igual |
 | Streaming TTS | PCM16 por frase | no aplica |
-| Streaming ASR | pendiente | pendiente |
+| Streaming ASR | `streamd` WebSocket + Kroko | no aplica |
 | MCP | `vox_*` | `auris_*` |
 | Config get/set/reset | sí | sí |
 | Doctor y métricas | sí | sí |
@@ -51,9 +51,9 @@ Revisado en `cmd/`, `internal/` y los tests:
    es VAD (Silero) y 2–3 s de overlap con deduplicación de texto; el corte fijo puede partir palabras
    y perder contexto. Investigación: SayToWords, guías de chunking de Whisper (20–30 s batch,
    2–3 s overlap, VAD).
-2. **Streaming ASR real.** Vox ya manda PCM16 por frase; Auris sigue siendo offline por ventana.
-   Para hablar y ver texto mientras hablás hace falta un modelo online (Zipformer) o
-   Whisper-Streaming con VAD y LocalAgreement; el Whisper offline actual no alcanza.
+2. **Streaming ASR: calidad y VAD.** El componente `streamd` ya acepta PCM16 por WebSocket y devuelve
+   parciales con Kroko. Falta VAD para cortar por silencio real, ajustar endpoint/overlap y medir WER
+   en español; hoy el corte lo decide el modelo con `EnableEndpoint`.
 3. **Concurrencia del motor.** `Engine.Speak` y `Engine.Transcribe` serializan todo con un mutex:
    evita OOM, pero un job largo bloquea a los demás. Medir y decidir pool o límite de cola.
 
