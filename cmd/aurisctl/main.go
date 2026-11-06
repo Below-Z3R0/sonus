@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
+	"github.com/Below-Z3R0/sonus/internal/config"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -30,7 +32,7 @@ func main() {
 	case "status":
 		get(base + "/v1/status")
 	case "models":
-		get(base + "/v1/models")
+		modelsCmd(os.Args[2:])
 	case "transcribe":
 		fs := flag.NewFlagSet("transcribe", flag.ExitOnError)
 		out := fs.String("out", "", "output file (empty = stdout)")
@@ -47,7 +49,59 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "aurisctl version|status|models|transcribe <archivo> [--out DIR]")
+	fmt.Fprintln(os.Stderr, "aurisctl version|status|models list|show <id>|use <id>|transcribe <archivo> [--out DIR]")
+}
+
+func modelsCmd(args []string) {
+	cfgPath := config.FilePath()
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if len(args) == 0 || args[0] == "list" {
+		fmt.Println("ID	TIER	DEFAULT")
+		for _, m := range catalog.List() {
+			def := ""
+			if m.ID == cfg.Defaults.ASR {
+				def = "*"
+			}
+			fmt.Printf("%s	%s	%s\n", m.ID, m.Tier, def)
+		}
+		return
+	}
+	switch args[0] {
+	case "show":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "uso: aurisctl models show <id>")
+			os.Exit(1)
+		}
+		m, ok := catalog.Get(args[1])
+		if !ok {
+			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
+			os.Exit(1)
+		}
+		out, _ := json.MarshalIndent(m, "", "  ")
+		fmt.Println(string(out))
+	case "use":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "uso: aurisctl models use <id>")
+			os.Exit(1)
+		}
+		if _, ok := catalog.Get(args[1]); !ok {
+			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
+			os.Exit(1)
+		}
+		cfg.Defaults.ASR = args[1]
+		if err := cfg.Save(cfgPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Auris default = %s (reiniciá el servicio para cargarlo)\n", args[1])
+	default:
+		usage()
+		os.Exit(1)
+	}
 }
 
 func get(url string) {
@@ -105,5 +159,4 @@ func transcribe(base, path, out string) {
 	if len(raw) > 0 && raw[len(raw)-1] != '\n' {
 		fmt.Println()
 	}
-	_ = json.Valid
 }

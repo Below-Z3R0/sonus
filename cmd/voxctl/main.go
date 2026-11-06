@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 	"io"
 	"net/http"
 	"os"
@@ -29,14 +31,20 @@ func main() {
 	case "status":
 		get(base + "/v1/status")
 	case "voices":
-		get(base + "/v1/voices")
+		cfg, _ := config.Load(config.FilePath())
+		model := catalog.Default()
+		if m, ok := catalog.Get(cfg.Defaults.TTS); ok {
+			model = m
+		}
+		out, _ := json.MarshalIndent(model.Voices, "", "  ")
+		fmt.Println(string(out))
 	case "models":
-		get(base + "/v1/models")
+		modelsCmd(os.Args[2:])
 	case "speak":
 		fs := flag.NewFlagSet("speak", flag.ExitOnError)
 		file := fs.String("file", "", "read text from a file")
 		out := fs.String("out", "", "output audio file")
-		voice := fs.String("voice", "es_female", "voice id")
+		voice := fs.String("voice", "ef_dora", "voice id")
 		_ = fs.Parse(os.Args[2:])
 		text := fs.Arg(0)
 		if *file != "" {
@@ -59,7 +67,59 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|voices|models|speak \"texto\" [--file F] [--voice V] [--out F]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--voice V] [--out F]")
+}
+
+func modelsCmd(args []string) {
+	cfgPath := config.FilePath()
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if len(args) == 0 || args[0] == "list" {
+		fmt.Println("ID	TIER	DEFAULT	VOICES")
+		for _, m := range catalog.List() {
+			def := ""
+			if m.ID == cfg.Defaults.TTS {
+				def = "*"
+			}
+			fmt.Printf("%s	%s	%s	%d\n", m.ID, m.Tier, def, len(m.Voices))
+		}
+		return
+	}
+	switch args[0] {
+	case "show":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "uso: voxctl models show <id>")
+			os.Exit(1)
+		}
+		m, ok := catalog.Get(args[1])
+		if !ok {
+			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
+			os.Exit(1)
+		}
+		out, _ := json.MarshalIndent(m, "", "  ")
+		fmt.Println(string(out))
+	case "use":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "uso: voxctl models use <id>")
+			os.Exit(1)
+		}
+		if _, ok := catalog.Get(args[1]); !ok {
+			fmt.Fprintf(os.Stderr, "modelo %s no existe\n", args[1])
+			os.Exit(1)
+		}
+		cfg.Defaults.TTS = args[1]
+		if err := cfg.Save(cfgPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Vox default = %s (reiniciá el servicio para cargarlo)\n", args[1])
+	default:
+		usage()
+		os.Exit(1)
+	}
 }
 
 func get(url string) {

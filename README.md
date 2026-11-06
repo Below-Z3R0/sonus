@@ -42,14 +42,24 @@ Servicios:
 
 ## Modelos
 
-Solo ONNX:
+Catálogos separados, como Argos:
 
-- ASR: Whisper large-v3-turbo / small.
-- TTS: Kokoro-82M / Piper Spanish.
-- VAD: Silero.
+- **Auris** (`aurisctl models`): solo ASR.
+  ```text
+  whisper-turbo-onnx   balanced  *
+  whisper-small-onnx   fast
+  ```
+- **Vox** (`voxctl models`): solo TTS y sus voces.
+  ```text
+  kokoro-82m-onnx   balanced  *  4 voces
+  piper-es-onnx     fast          2 voces
+  ```
 
-`aurisctl models` y `voxctl models` muestran el catálogo; `models use` cambiará el default cuando
-el motor esté conectado.
+`models use <id>` cambia el default y lo guarda en `~/.config/sonus/config.yaml`; el servicio lo
+carga al reiniciar. Los modelos no están en la imagen: van al volumen y se gestionan por CLI.
+
+Kokoro es el default de Vox; incluye voces españolas (`ef_dora`, `em_alex`). Piper queda como
+fallback liviano.
 
 ## Plan
 

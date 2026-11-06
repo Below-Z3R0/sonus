@@ -8,7 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Below-Z3R0/sonus/internal/models"
+	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
+	"github.com/Below-Z3R0/sonus/internal/config"
 )
 
 const version = "0.1.0"
@@ -16,16 +17,21 @@ const version = "0.1.0"
 func main() {
 	addr := flag.String("addr", "0.0.0.0:9101", "listen address")
 	flag.Parse()
+	cfg, _ := config.Load(config.FilePath())
+	model := catalog.Default()
+	if m, ok := catalog.Get(cfg.Defaults.ASR); ok {
+		model = m
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.HandleFunc("/v1/status", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]any{"service": "auris", "version": version, "state": "scaffold"})
+		writeJSON(w, map[string]any{"service": "auris", "version": version, "state": "scaffold", "model": model.ID})
 	})
 	mux.HandleFunc("/v1/transcribe", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "transcription engine not wired yet", http.StatusNotImplemented)
 	})
 	mux.HandleFunc("/v1/models", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, models.List(models.TaskASR))
+		writeJSON(w, catalog.List())
 	})
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	fmt.Fprintf(os.Stderr, "aurisd %s on %s\n", version, *addr)
