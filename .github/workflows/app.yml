@@ -57,3 +57,4 @@ jobs:
         run: |
           docker run --rm ghcr.io/below-z3r0/sonus:${{ matrix.variant }}-${{ github.sha }} aurisctl version
           docker run --rm ghcr.io/below-z3r0/sonus:${{ matrix.variant }}-${{ github.sha }} voxctl version
+          docker run --rm ghcr.io/below-z3r0/sonus:${{ matrix.variant }}-${{ github.sha }} streamctl version
