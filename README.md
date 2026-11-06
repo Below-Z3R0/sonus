@@ -85,7 +85,7 @@ voxctl service load kokoro-82m-onnx
 ```bash
 voxctl models list
 ID               TIER      DEFAULT  STATE     EXTRA
-kokoro-82m-onnx  balanced  *        ready     4 voices
+kokoro-82m-onnx  balanced  *        ready     5 voices
 piper-es-onnx    fast               missing   2 voices
 ```
 
@@ -113,7 +113,7 @@ Catálogos separados, como Argos:
   ```
 - **Vox** (`voxctl models`): solo TTS y sus voces.
   ```text
-  kokoro-82m-onnx   balanced  *  4 voces
+  kokoro-82m-onnx   balanced  *  5 voces
   piper-es-onnx     fast          2 voces
   ```
 
