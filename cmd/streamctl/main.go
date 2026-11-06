@@ -2,15 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"math"
 	"os"
 	"time"
 
-	"github.com/coder/websocket"
 	sherpa "github.com/k2-fsa/sherpa-onnx-go/v2/sherpa_onnx"
 
 	"github.com/Below-Z3R0/sonus/internal/cliutil"
@@ -44,6 +40,8 @@ func main() {
 		err = cliutil.Service(base, os.Args[2:])
 	case "stream":
 		err = streamCmd(base, os.Args[2:])
+	case "listen":
+		err = listenCmd(base, os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -55,7 +53,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|config get|set|reset|stream <archivo.wav>")
+	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|config get|set|reset|stream <archivo.wav>|listen [--device D] [--threshold N] [--silence-ms N] [--seconds N]")
 }
 
 func modelsCmd(args []string) error {
@@ -128,40 +126,12 @@ func streamCmd(base string, args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	url := base + "/v1/stream"
-	if len(url) > 4 && url[:4] == "http" {
-		url = "ws" + url[4:]
-	}
-	c, _, err := websocket.Dial(ctx, url, nil)
+	s, err := dialStream(ctx, base)
 	if err != nil {
 		return err
 	}
-	defer c.CloseNow()
-
-	done := make(chan error, 1)
-	go func() {
-		for {
-			typ, data, err := c.Read(ctx)
-			if err != nil {
-				if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-					done <- nil
-					return
-				}
-				done <- err
-				return
-			}
-			if typ != websocket.MessageText {
-				continue
-			}
-			var m struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			}
-			if json.Unmarshal(data, &m) == nil && m.Text != "" {
-				fmt.Printf("%s: %s\n", m.Type, m.Text)
-			}
-		}
-	}()
+	defer s.close()
+	s.start()
 
 	step := wave.SampleRate / 10
 	for start := 0; start < len(wave.Samples); start += step {
@@ -169,24 +139,77 @@ func streamCmd(base string, args []string) error {
 		if end > len(wave.Samples) {
 			end = len(wave.Samples)
 		}
-		buf := make([]byte, 0, (end-start)*2)
-		for _, sample := range wave.Samples[start:end] {
-			v := int16(math.Round(float64(sample) * math.MaxInt16))
-			var b [2]byte
-			binary.LittleEndian.PutUint16(b[:], uint16(v))
-			buf = append(buf, b[:]...)
-		}
-		if err := c.Write(ctx, websocket.MessageBinary, buf); err != nil {
+		if err := s.send(wave.Samples[start:end]); err != nil {
 			return err
 		}
 	}
-	if err := c.Write(ctx, websocket.MessageText, []byte("done")); err != nil {
+	return s.finish()
+}
+
+func listenCmd(base string, args []string) error {
+	fs := flag.NewFlagSet("listen", flag.ContinueOnError)
+	device := fs.String("device", "", "PipeWire/ALSA device")
+	threshold := fs.Float64("threshold", 500, "RMS threshold for speech")
+	silenceMS := fs.Int("silence-ms", 700, "silence before closing the utterance")
+	maxSeconds := fs.Int("seconds", 60, "maximum capture time")
+	flags, _ := cliutil.SplitFlags(args, map[string]bool{
+		"--device": true, "-device": true,
+		"--threshold": true, "-threshold": true,
+		"--silence-ms": true, "-silence-ms": true,
+		"--seconds": true, "-seconds": true,
+	})
+	if err := fs.Parse(flags); err != nil {
 		return err
 	}
-	select {
-	case err := <-done:
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*maxSeconds)*time.Second)
+	defer cancel()
+	s, err := dialStream(ctx, base)
+	if err != nil {
 		return err
-	case <-ctx.Done():
-		return ctx.Err()
 	}
+	defer s.close()
+	s.start()
+
+	mic, cleanup, err := openMic(ctx, *device)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	frame := make([]byte, 640) // 20 ms at 16 kHz, s16le
+	speech := false
+	var silenceSince time.Time
+	start := time.Now()
+	for {
+		n, err := mic.Read(frame)
+		if n > 0 {
+			chunk := frame[:n]
+			if rms16(chunk) >= *threshold {
+				speech = true
+				silenceSince = time.Time{}
+				if err := s.sendRaw(chunk); err != nil {
+					return err
+				}
+			} else if speech {
+				if silenceSince.IsZero() {
+					silenceSince = time.Now()
+				}
+				if time.Since(silenceSince) >= time.Duration(*silenceMS)*time.Millisecond {
+					break
+				}
+			} else if time.Since(start) > 10*time.Second {
+				return fmt.Errorf("no se detectó voz")
+			}
+		}
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return err
+		}
+		if time.Since(start) > time.Duration(*maxSeconds)*time.Second {
+			break
+		}
+	}
+	return s.finish()
 }

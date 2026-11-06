@@ -25,8 +25,12 @@ type Model struct {
 const baseURL = "https://huggingface.co/hudaiapa88/sherpa-stt-onnx/resolve/main/es/"
 
 func krokoFiles(variant string) []modeldl.File {
+	size := int64(153185997)
+	if variant == "kroko_128l" {
+		size = 153182955
+	}
 	return []modeldl.File{
-		{Name: "encoder.int8.onnx", URL: baseURL + variant + "/encoder.int8.onnx", Size: 153185997, SHA256: shaFor(variant, "encoder")},
+		{Name: "encoder.int8.onnx", URL: baseURL + variant + "/encoder.int8.onnx", Size: size, SHA256: shaFor(variant, "encoder")},
 		{Name: "decoder.int8.onnx", URL: baseURL + variant + "/decoder.int8.onnx", Size: 606495, SHA256: shaFor(variant, "decoder")},
 		{Name: "joiner.int8.onnx", URL: baseURL + variant + "/joiner.int8.onnx", Size: 337105, SHA256: shaFor(variant, "joiner")},
 		{Name: "tokens.txt", URL: baseURL + variant + "/tokens.txt", Size: 7037},

@@ -57,6 +57,11 @@ streamctl stream audio.wav
 - `kroko-es-128l` es la variante de mayor precisión; más cómputo por chunk.
 - `streamctl stream archivo.wav` abre `ws://127.0.0.1:9103/v1/stream`, manda PCM16 16 kHz por chunks y
   muestra `partial`/`final`.
+- `streamctl listen` captura del micrófono con `parec`/`arecord`, aplica un gate de energía y manda
+  sólo voz; corta al detectar `--silence-ms` de silencio. El micrófono vive en el host, no en el
+  contenedor.
+- El plugin de Hermes Desktop `integrations/hermes-desktop/sonus-read/` consume `message.delta` y
+  manda cada frase a `/v1/speech/stream`; ver su README.
 
 Protocolo WebSocket:
 

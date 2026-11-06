@@ -45,7 +45,7 @@ func (e *Engine) Load(id string) error {
 	cfg.DecodingMethod = "greedy_search"
 	cfg.EnableEndpoint = 1
 	cfg.Rule1MinTrailingSilence = 2.4
-	cfg.Rule2MinTrailingSilence = 1.2
+	cfg.Rule2MinTrailingSilence = 2.0
 	cfg.Rule3MinUtteranceLength = 20
 
 	rec := sherpa.NewOnlineRecognizer(&cfg)

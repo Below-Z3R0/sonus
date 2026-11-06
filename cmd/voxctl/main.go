@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"flag"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	auriscatalog "github.com/Below-Z3R0/sonus/internal/auris/catalog"
@@ -48,6 +50,8 @@ func main() {
 		err = cliutil.JobCmd(base, os.Args[2:])
 	case "speak":
 		err = speakCmd(base, os.Args[2:])
+	case "read":
+		err = readCmd(base)
 	default:
 		usage()
 		os.Exit(1)
@@ -59,7 +63,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|retry|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|retry|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]|read")
 }
 
 func voicesCmd() error {
@@ -176,6 +180,20 @@ func speakCmd(base string, args []string) error {
 		return speakStream(base, text, *lang, *voice, *out)
 	}
 	return speak(base, text, *lang, *voice, *out)
+}
+
+func readCmd(base string) error {
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if err := speakStream(base, line, "auto", "", ""); err != nil {
+			return err
+		}
+	}
+	return scanner.Err()
 }
 
 func speakStream(base, text, lang, voice, out string) error {
