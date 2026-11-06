@@ -63,7 +63,8 @@ filtra silencio/ruido antes de alimentar el reconocedor. Si el archivo no existe
   muestra `partial`/`final`.
 - `streamctl listen` captura del micrófono con `parec`/`arecord`, aplica un gate de energía y manda
   sólo voz; corta al detectar `--silence-ms` de silencio. El micrófono vive en el host, no en el
-  contenedor.
+  contenedor. En esta máquina el input ALSA es `plughw:0,0`:
+  `streamctl listen --backend arecord --device plughw:0,0 --seconds 20`.
 - `streamd` usa Silero VAD del lado del servidor si existe `<models>/vad/silero_vad.onnx`; filtra
   ruido y precarga 200 ms antes del inicio de voz.
 - El plugin de Hermes Desktop `integrations/hermes-desktop/sonus-read/` consume `message.delta` y

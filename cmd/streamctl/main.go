@@ -55,7 +55,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|vad status|install|config get|set|reset|stream <archivo.wav>|listen [--device D] [--threshold N] [--silence-ms N] [--seconds N]")
+	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|vad status|install|config get|set|reset|stream <archivo.wav>|listen [--device D] [--backend auto|parec|arecord] [--threshold N] [--silence-ms N] [--seconds N]")
 }
 
 func vadCmd(args []string) error {
@@ -187,11 +187,13 @@ func streamCmd(base string, args []string) error {
 func listenCmd(base string, args []string) error {
 	fs := flag.NewFlagSet("listen", flag.ContinueOnError)
 	device := fs.String("device", "", "PipeWire/ALSA device")
+	backend := fs.String("backend", "auto", "auto|parec|arecord")
 	threshold := fs.Float64("threshold", 500, "RMS threshold for speech")
 	silenceMS := fs.Int("silence-ms", 700, "silence before closing the utterance")
 	maxSeconds := fs.Int("seconds", 60, "maximum capture time")
 	flags, _ := cliutil.SplitFlags(args, map[string]bool{
 		"--device": true, "-device": true,
+		"--backend": true, "-backend": true,
 		"--threshold": true, "-threshold": true,
 		"--silence-ms": true, "-silence-ms": true,
 		"--seconds": true, "-seconds": true,
@@ -208,7 +210,7 @@ func listenCmd(base string, args []string) error {
 	defer s.close()
 	s.start()
 
-	mic, cleanup, err := openMic(ctx, *device)
+	mic, cleanup, err := openMic(ctx, *device, *backend)
 	if err != nil {
 		return err
 	}

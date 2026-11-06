@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"os/exec"
+	"strings"
 
 	"github.com/coder/websocket"
 )
@@ -93,13 +94,19 @@ func pcmBytes(samples []float32) []byte {
 	return buf
 }
 
-func openMic(ctx context.Context, device string) (io.ReadCloser, func(), error) {
-	if _, err := exec.LookPath("parec"); err == nil {
-		args := []string{"--format=s16le", "--rate=16000", "--channels=1", "--latency-msec=20"}
-		if device != "" {
-			args = append(args, "--device="+device)
+func openMic(ctx context.Context, device, backend string) (io.ReadCloser, func(), error) {
+	useParec := backend == "parec" || (backend == "" || backend == "auto") && !strings.HasPrefix(device, "hw:") && !strings.HasPrefix(device, "plughw:")
+	if useParec {
+		if _, err := exec.LookPath("parec"); err == nil {
+			args := []string{"--format=s16le", "--rate=16000", "--channels=1", "--latency-msec=20"}
+			if device != "" {
+				args = append(args, "--device="+device)
+			}
+			return startCapture(ctx, "parec", args...)
 		}
-		return startCapture(ctx, "parec", args...)
+	}
+	if backend == "parec" {
+		return nil, func() {}, fmt.Errorf("parec no está en PATH")
 	}
 	if _, err := exec.LookPath("arecord"); err == nil {
 		args := []string{"-q", "-f", "S16_LE", "-r", "16000", "-c", "1", "-t", "raw"}
