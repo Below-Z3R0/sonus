@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/Below-Z3R0/sonus/internal/api"
 )
 
 type daemon struct {
@@ -40,7 +42,7 @@ func main() {
 	mux.Handle("/mcp", handler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprintln(w, "ok") })
 	fmt.Printf("sonus-mcp on %s (vox %s, auris %s)\n", *addr, *voxURL, *aurisURL)
-	if err := http.ListenAndServe(*addr, mux); err != nil {
+	if err := api.Serve(*addr, mux); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

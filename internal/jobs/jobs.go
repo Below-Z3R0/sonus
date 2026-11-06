@@ -56,6 +56,17 @@ func (m *Manager) Start(kind string, ctx context.Context, fn func(context.Contex
 	m.mu.Unlock()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				m.mu.Lock()
+				job.State = Failed
+				job.Error = fmt.Sprintf("panic: %v", r)
+				job.FinishedAt = time.Now().UTC()
+				m.evictLocked()
+				m.mu.Unlock()
+			}
+		}()
+
 		m.mu.Lock()
 		job.State = Running
 		job.StartedAt = time.Now().UTC()
