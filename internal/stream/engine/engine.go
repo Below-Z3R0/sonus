@@ -29,6 +29,9 @@ func (e *Engine) Load(id string) error {
 	if !ok {
 		return fmt.Errorf("modelo desconocido: %s", id)
 	}
+	if !m.Supported {
+		return fmt.Errorf("%s requiere chunk %d/%d; este runtime solo soporta el layout 141/128 (usá kroko-es-64l)", id, m.ChunkFrames, m.DecodeChunkLen)
+	}
 	dir, err := findModelDir(e.root, id)
 	if err != nil {
 		return err

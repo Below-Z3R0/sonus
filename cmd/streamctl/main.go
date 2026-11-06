@@ -83,15 +83,24 @@ func vadCmd(args []string) error {
 
 func modelsCmd(args []string) error {
 	cfgPath := config.FilePath()
+	if len(args) >= 2 && args[0] == "use" {
+		if m, ok := catalog.Get(args[1]); ok && !m.Supported {
+			return fmt.Errorf("%s usa chunk %d/%d; este runtime solo soporta 141/128", m.ID, m.ChunkFrames, m.DecodeChunkLen)
+		}
+	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return err
 	}
 	rows := make([]cliutil.ModelRow, 0, len(catalog.List()))
 	for _, m := range catalog.List() {
+		extra := fmt.Sprintf("chunk %d/%d", m.ChunkFrames, m.DecodeChunkLen)
+		if !m.Supported {
+			extra += " no soportado"
+		}
 		rows = append(rows, cliutil.ModelRow{
 			ID: m.ID, Tier: m.Tier,
-			Extra: "streaming es",
+			Extra: extra,
 			State: modeldl.Describe(modeldl.Status(cfg.Paths.Models, m.ID)),
 		})
 	}
@@ -119,8 +128,12 @@ func configCmd(args []string) error {
 				return fmt.Errorf("variant inválida: %s", value)
 			}
 		case "defaults.stream":
-			if _, ok := catalog.Get(value); !ok {
+			m, ok := catalog.Get(value)
+			if !ok {
 				return fmt.Errorf("modelo streaming desconocido: %s", value)
+			}
+			if !m.Supported {
+				return fmt.Errorf("%s requiere chunk %d/%d; este runtime solo soporta 141/128", m.ID, m.ChunkFrames, m.DecodeChunkLen)
 			}
 		case "paths.models", "paths.data", "paths.media", "paths.output", "services.phonemizer":
 			if value == "" {

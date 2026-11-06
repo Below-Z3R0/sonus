@@ -10,16 +10,19 @@ import (
 )
 
 type Model struct {
-	ID       string         `json:"id"`
-	Name     string         `json:"name"`
-	Tier     string         `json:"tier"`
-	Default  bool           `json:"default"`
-	License  string         `json:"license"`
-	Homepage string         `json:"homepage"`
-	Notes    string         `json:"notes"`
-	RAMMB    int            `json:"ram_mb"`
-	DiskMB   int            `json:"disk_mb"`
-	Files    []modeldl.File `json:"files"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	Tier           string         `json:"tier"`
+	Default        bool           `json:"default"`
+	License        string         `json:"license"`
+	Homepage       string         `json:"homepage"`
+	Notes          string         `json:"notes"`
+	RAMMB          int            `json:"ram_mb"`
+	DiskMB         int            `json:"disk_mb"`
+	ChunkFrames    int            `json:"chunk_frames"`
+	DecodeChunkLen int            `json:"decode_chunk_len"`
+	Supported      bool           `json:"supported"`
+	Files          []modeldl.File `json:"files"`
 }
 
 const baseURL = "https://huggingface.co/hudaiapa88/sherpa-stt-onnx/resolve/main/es/"
@@ -64,13 +67,13 @@ var models = []Model{
 		ID: "kroko-es-64l", Name: "Kroko Spanish 64L (streaming)", Tier: "fast", Default: true,
 		License: "Apache-2.0", Homepage: "https://huggingface.co/hudaiapa88/sherpa-stt-onnx",
 		Notes: "Zipformer2 transducer; faster inference, good accuracy.",
-		RAMMB: 700, DiskMB: 160, Files: krokoFiles("kroko_64l"),
+		RAMMB: 700, DiskMB: 160, ChunkFrames: 141, DecodeChunkLen: 128, Supported: true, Files: krokoFiles("kroko_64l"),
 	},
 	{
 		ID: "kroko-es-128l", Name: "Kroko Spanish 128L (streaming)", Tier: "accurate",
 		License: "Apache-2.0", Homepage: "https://huggingface.co/hudaiapa88/sherpa-stt-onnx",
 		Notes: "Zipformer2 transducer; highest accuracy, more compute per chunk.",
-		RAMMB: 900, DiskMB: 160, Files: krokoFiles("kroko_128l"),
+		RAMMB: 900, DiskMB: 160, ChunkFrames: 269, DecodeChunkLen: 256, Supported: false, Files: krokoFiles("kroko_128l"),
 	},
 }
 
