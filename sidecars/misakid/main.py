@@ -9,6 +9,7 @@ engine until the native misaki.en model is installed.
 from __future__ import annotations
 
 import threading
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -16,7 +17,12 @@ from pydantic import BaseModel
 
 from misaki import espeak
 
-app = FastAPI(title="misakid", version="1.0.0")
+try:
+    from misaki import en as misaki_en
+except ImportError:  # optional native English G2P
+    misaki_en = None
+
+app = FastAPI(title="misakid", version="1.1.0")
 
 _aliases = {
     "es": "es",
@@ -32,7 +38,7 @@ _aliases = {
     "pt-br": "pt-br",
     "hi": "hi",
 }
-_cache: dict[str, espeak.EspeakG2P] = {}
+_cache: dict[str, Any] = {}
 _lock = threading.Lock()
 
 
@@ -41,13 +47,20 @@ class Request(BaseModel):
     lang: str = "es"
 
 
-def engine(lang: str) -> espeak.EspeakG2P:
+def engine(lang: str) -> Any:
     code = _aliases.get(lang.lower())
     if not code:
         raise HTTPException(status_code=400, detail=f"unsupported language: {lang}")
     with _lock:
         if code not in _cache:
-            _cache[code] = espeak.EspeakG2P(language=code)
+            if code in ("en-us", "en-gb") and misaki_en is not None:
+                _cache[code] = misaki_en.G2P(
+                    trf=False,
+                    british=code == "en-gb",
+                    fallback=espeak.EspeakFallback(british=code == "en-gb"),
+                )
+            else:
+                _cache[code] = espeak.EspeakG2P(language=code)
         return _cache[code]
 
 

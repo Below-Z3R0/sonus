@@ -13,7 +13,7 @@ curl -sS -X POST http://127.0.0.1:9200/v1/phonemize \
 ```
 
 - Español: `misaki.espeak.EspeakG2P` (espeak-ng debajo).
-- Inglés: mismo motor hasta instalar el módulo nativo `misaki.en`.
+- Inglés: `misaki.en` nativo para en-US/en-GB, con fallback de espeak.
 - El servicio no sintetiza audio; solo produce el contrato de fonemas que `voxd` pasa a
   `GenerationConfig.PhonemeCodepoints`.
 - `GET /healthz` para el healthcheck de compose.

@@ -75,19 +75,27 @@ func writeState(root, id string, st State) {
 	_ = os.WriteFile(statePath(root, id), data, 0o644)
 }
 
+// FreeBytes reports the space available under root.
+func FreeBytes(root string) (int64, error) {
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return 0, err
+	}
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(root, &st); err != nil {
+		return 0, err
+	}
+	return int64(st.Bavail) * int64(st.Bsize), nil
+}
+
 // CheckSpace fails before a download that cannot fit in the models volume.
 func CheckSpace(root string, required int64) error {
 	if required <= 0 {
 		return nil
 	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	free, err := FreeBytes(root)
+	if err != nil {
 		return err
 	}
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(root, &st); err != nil {
-		return err
-	}
-	free := int64(st.Bavail) * int64(st.Bsize)
 	if free < required {
 		return fmt.Errorf("espacio insuficiente: necesitás %d MB, hay %d MB", required>>20, free>>20)
 	}

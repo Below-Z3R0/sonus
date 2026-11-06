@@ -54,7 +54,9 @@ voxctl speak "texto largo" --file texto.txt --out texto.wav
 `--voice` permite forzar una voz concreta.
 
 `voxd` usa Kokoro; `misakid` convierte el texto a fonemas con el frontend oficial de Kokoro
-(misaki; para español, `misaki.espeak` con espeak-ng). El WAV sale a 24 kHz, 16 bit, mono.
+(misaki; para español, `misaki.espeak` con espeak-ng; para inglés, `misaki.en`). El texto se divide
+en fragmentos de `max_chars` (400 por defecto), se detecta el idioma de cada fragmento y los WAV se
+concatenan en uno solo a 24 kHz, 16 bit, mono.
 
 Voces Kokoro incluidas en el preset: `em_santa` (es, sid 53), `ef_dora` (es, sid 28),
 `em_alex` (es, sid 29), `af_heart` (en-US, sid 3), `am_puck` (en-US, sid 18).
@@ -68,8 +70,20 @@ aurisctl transcribe audio.wav
 aurisctl transcribe audio.wav --out transcripciones
 ```
 
-La entrada es WAV PCM; sherpa remuestrea a 16 kHz. La salida es texto plano, con el idioma detectado
-por Whisper en la respuesta HTTP.
+La entrada es WAV PCM; sherpa remuestrea a 16 kHz y parte audios de más de 30 segundos en bloques.
+La salida es texto plano, con el idioma detectado por Whisper en la respuesta HTTP.
+
+## Diagnóstico y métricas
+
+```bash
+curl -sS http://127.0.0.1:9102/v1/doctor
+curl -sS http://127.0.0.1:9102/v1/metrics
+curl -sS http://127.0.0.1:9101/v1/doctor
+curl -sS http://127.0.0.1:9101/v1/metrics
+```
+
+`doctor` muestra estado del modelo, espacio libre, RAM disponible y, en Vox, salud de `misakid`.
+`metrics` cuenta requests, errores y duración acumulada.
 
 ## Ciclo de vida del modelo
 

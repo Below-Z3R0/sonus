@@ -78,7 +78,8 @@ func (e *Engine) Unload() {
 	}
 }
 
-// Transcribe reads a WAV file and returns Whisper's text.
+// Transcribe reads a WAV file and returns Whisper's text. Audio longer than
+// the model window is split into chunks; each chunk keeps the same recognizer.
 func (e *Engine) Transcribe(ctx context.Context, path string) (Result, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -92,15 +93,42 @@ func (e *Engine) Transcribe(ctx context.Context, path string) (Result, error) {
 	if wave == nil || len(wave.Samples) == 0 {
 		return Result{}, fmt.Errorf("audio inválido o formato no soportado: %s", filepath.Base(path))
 	}
-	stream := sherpa.NewOfflineStream(e.rec)
-	defer sherpa.DeleteOfflineStream(stream)
-	stream.AcceptWaveform(wave.SampleRate, wave.Samples)
-	e.rec.Decode(stream)
-	out := stream.GetResult()
-	if out == nil {
+	chunkSeconds := e.model.Profile.ChunkSeconds
+	if chunkSeconds <= 0 {
+		chunkSeconds = 30
+	}
+	chunkSamples := wave.SampleRate * chunkSeconds
+	var text, lang string
+	for start := 0; start < len(wave.Samples); start += chunkSamples {
+		if err := ctx.Err(); err != nil {
+			return Result{}, err
+		}
+		end := start + chunkSamples
+		if end > len(wave.Samples) {
+			end = len(wave.Samples)
+		}
+		stream := sherpa.NewOfflineStream(e.rec)
+		stream.AcceptWaveform(wave.SampleRate, wave.Samples[start:end])
+		e.rec.Decode(stream)
+		out := stream.GetResult()
+		sherpa.DeleteOfflineStream(stream)
+		if out == nil {
+			continue
+		}
+		if lang == "" {
+			lang = out.Lang
+		}
+		if out.Text != "" {
+			if text != "" {
+				text += " "
+			}
+			text += out.Text
+		}
+	}
+	if text == "" {
 		return Result{}, errors.New("Whisper no devolvió resultado")
 	}
-	return Result{Text: out.Text, Lang: out.Lang}, nil
+	return Result{Text: text, Lang: lang}, nil
 }
 
 func findModelDir(root, id string) (string, error) {

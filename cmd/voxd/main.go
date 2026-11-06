@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Below-Z3R0/sonus/internal/api"
 	"github.com/Below-Z3R0/sonus/internal/config"
 	"github.com/Below-Z3R0/sonus/internal/meminfo"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
+	"github.com/Below-Z3R0/sonus/internal/obs"
 	"github.com/Below-Z3R0/sonus/internal/runtime"
 	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 	voxengine "github.com/Below-Z3R0/sonus/internal/vox/engine"
@@ -46,6 +49,23 @@ func main() {
 	}, eng.Unload)
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
+	api.RegisterMetrics(mux, obs.Snapshot)
+	api.RegisterDoctor(mux, func() any {
+		st := mgr.Status()
+		free, _ := modeldl.FreeBytes(cfg.Paths.Models)
+		ram, _ := meminfo.AvailableMB()
+		ph := "ok"
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := eng.Health(ctx); err != nil {
+			ph = "unreachable"
+		}
+		return map[string]any{
+			"service": "vox", "status": st,
+			"model_dir": cfg.Paths.Models, "free_mb": free >> 20, "available_ram_mb": ram,
+			"phonemizer": ph,
+		}
+	})
 	mux.HandleFunc("/v1/speech", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)

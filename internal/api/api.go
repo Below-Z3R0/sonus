@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/Below-Z3R0/sonus/internal/obs"
 )
 
 func Handler(status func() any, models any) *http.ServeMux {
@@ -27,6 +29,21 @@ func Handler(status func() any, models any) *http.ServeMux {
 	return mux
 }
 
+// RegisterMetrics exposes the counters collected by obs.Middleware.
+func RegisterMetrics(mux *http.ServeMux, snapshot func() map[string]any) {
+	mux.HandleFunc("/v1/metrics", func(w http.ResponseWriter, _ *http.Request) {
+		WriteJSON(w, snapshot())
+	})
+}
+
+// RegisterDoctor exposes service-specific diagnostics without failing the
+// request when an optional dependency is down.
+func RegisterDoctor(mux *http.ServeMux, doctor func() any) {
+	mux.HandleFunc("/v1/doctor", func(w http.ResponseWriter, _ *http.Request) {
+		WriteJSON(w, doctor())
+	})
+}
+
 func WriteJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
@@ -36,7 +53,7 @@ func WriteJSON(w http.ResponseWriter, v any) {
 func Serve(addr string, handler http.Handler) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           handler,
+		Handler:           obs.Middleware(handler),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      5 * time.Minute,

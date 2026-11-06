@@ -30,6 +30,25 @@ func New(url string) *Client {
 	}
 }
 
+func (c *Client) Health(ctx context.Context) error {
+	if c == nil || c.URL == "" {
+		return fmt.Errorf("phonemizer URL vacía")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.URL+"/healthz", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("phonemizer: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // Phonemize returns the phoneme string and its Unicode codepoints. The
 // codepoints are what sherpa-onnx expects in GenerationConfig.
 func (c *Client) Phonemize(ctx context.Context, text, lang string) (Result, error) {

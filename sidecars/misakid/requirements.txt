@@ -1,4 +1,4 @@
-misaki==0.9.4
+misaki[en]==0.9.4
 espeakng-loader
 phonemizer-fork
 fastapi

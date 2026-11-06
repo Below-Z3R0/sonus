@@ -92,7 +92,13 @@ func VoiceFor(m catalog.Model, lang, voiceID string) (catalog.Voice, error) {
 	return catalog.Voice{}, fmt.Errorf("el modelo no tiene voz para %q", lang)
 }
 
-// Speak phonemizes with misakid and synthesizes a WAV.
+// Health checks the external phonemizer.
+func (e *Engine) Health(ctx context.Context) error {
+	return e.phon.Health(ctx)
+}
+
+// Speak phonemizes with misakid and synthesizes a WAV. Long text is split
+// into chunks, and each chunk detects its own language when lang is auto.
 func (e *Engine) Speak(ctx context.Context, text, lang, voiceID string) ([]byte, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -102,26 +108,44 @@ func (e *Engine) Speak(ctx context.Context, text, lang, voiceID string) ([]byte,
 	if strings.TrimSpace(text) == "" {
 		return nil, errors.New("texto vacío")
 	}
-	if lang == "" || lang == "auto" {
-		lang = langdetect.Detect(text)
+	chunks := SplitText(text, e.model.Profile.MaxChars)
+	if len(chunks) == 0 {
+		return nil, errors.New("texto vacío")
 	}
-	voice, err := VoiceFor(e.model, lang, voiceID)
-	if err != nil {
-		return nil, err
+	var samples []float32
+	var sampleRate int
+	for i, chunk := range chunks {
+		chunkLang := lang
+		if chunkLang == "" || chunkLang == "auto" {
+			chunkLang = langdetect.Detect(chunk)
+		}
+		voice, err := VoiceFor(e.model, chunkLang, voiceID)
+		if err != nil {
+			return nil, err
+		}
+		ph, err := e.phon.Phonemize(ctx, chunk, chunkLang)
+		if err != nil {
+			return nil, err
+		}
+		audio := e.tts.GenerateWithConfig("", &sherpa.GenerationConfig{
+			Sid:               voice.SID,
+			Speed:             float32(e.model.Profile.Speed),
+			PhonemeCodepoints: [][]int32{ph.Codepoints},
+		}, nil)
+		if audio == nil || len(audio.Samples) == 0 {
+			return nil, errors.New("Kokoro no generó audio")
+		}
+		if sampleRate == 0 {
+			sampleRate = audio.SampleRate
+		} else if audio.SampleRate != sampleRate {
+			return nil, errors.New("Kokoro cambió el sample rate entre chunks")
+		}
+		if i > 0 {
+			samples = append(samples, make([]float32, sampleRate/20)...) // 50 ms
+		}
+		samples = append(samples, audio.Samples...)
 	}
-	ph, err := e.phon.Phonemize(ctx, text, lang)
-	if err != nil {
-		return nil, err
-	}
-	audio := e.tts.GenerateWithConfig("", &sherpa.GenerationConfig{
-		Sid:               voice.SID,
-		Speed:             float32(e.model.Profile.Speed),
-		PhonemeCodepoints: [][]int32{ph.Codepoints},
-	}, nil)
-	if audio == nil || len(audio.Samples) == 0 {
-		return nil, errors.New("Kokoro no generó audio")
-	}
-	wav := audio.ToBuffer()
+	wav := (&sherpa.GeneratedAudio{Samples: samples, SampleRate: sampleRate}).ToBuffer()
 	if len(wav) == 0 {
 		return nil, errors.New("Kokoro no serializó WAV")
 	}

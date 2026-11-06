@@ -15,6 +15,7 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/config"
 	"github.com/Below-Z3R0/sonus/internal/meminfo"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
+	"github.com/Below-Z3R0/sonus/internal/obs"
 	"github.com/Below-Z3R0/sonus/internal/runtime"
 )
 
@@ -48,6 +49,16 @@ func main() {
 	}, eng.Unload)
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
+	api.RegisterMetrics(mux, obs.Snapshot)
+	api.RegisterDoctor(mux, func() any {
+		st := mgr.Status()
+		free, _ := modeldl.FreeBytes(cfg.Paths.Models)
+		ram, _ := meminfo.AvailableMB()
+		return map[string]any{
+			"service": "auris", "status": st,
+			"model_dir": cfg.Paths.Models, "free_mb": free >> 20, "available_ram_mb": ram,
+		}
+	})
 	mux.HandleFunc("/v1/transcribe", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST required", http.StatusMethodNotAllowed)
