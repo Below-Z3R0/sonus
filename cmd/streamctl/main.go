@@ -34,6 +34,8 @@ func main() {
 		err = cliutil.PrintGet(base+"/v1/status", 10*time.Second)
 	case "models":
 		err = modelsCmd(os.Args[2:])
+	case "vad":
+		err = vadCmd(os.Args[2:])
 	case "config":
 		err = configCmd(os.Args[2:])
 	case "service":
@@ -53,7 +55,30 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|config get|set|reset|stream <archivo.wav>|listen [--device D] [--threshold N] [--silence-ms N] [--seconds N]")
+	fmt.Fprintln(os.Stderr, "streamctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|vad status|install|config get|set|reset|stream <archivo.wav>|listen [--device D] [--threshold N] [--silence-ms N] [--seconds N]")
+}
+
+func vadCmd(args []string) error {
+	cfg, err := config.Load(config.FilePath())
+	if err != nil {
+		return err
+	}
+	file := modeldl.File{
+		Name:   "silero_vad.onnx",
+		URL:    "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+		Size:   643854,
+		SHA256: "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+	}
+	if len(args) == 0 || args[0] == "status" {
+		st := modeldl.Status(cfg.Paths.Models, "vad")
+		fmt.Printf("vad: %s\n", modeldl.Describe(st))
+		return nil
+	}
+	if args[0] != "install" {
+		return fmt.Errorf("uso: streamctl vad status|install [--force]")
+	}
+	force := len(args) > 1 && args[1] == "--force"
+	return modeldl.InstallFiles(cfg.Paths.Models, "vad", []modeldl.File{file}, 2*1024*1024, force)
 }
 
 func modelsCmd(args []string) error {

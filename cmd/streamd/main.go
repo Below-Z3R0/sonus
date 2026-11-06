@@ -10,6 +10,8 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/coder/websocket"
@@ -22,6 +24,7 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/runtime"
 	"github.com/Below-Z3R0/sonus/internal/stream/catalog"
 	streamengine "github.com/Below-Z3R0/sonus/internal/stream/engine"
+	"github.com/Below-Z3R0/sonus/internal/vad"
 )
 
 const version = "0.1.0"
@@ -29,6 +32,7 @@ const version = "0.1.0"
 func main() {
 	addr := flag.String("addr", "0.0.0.0:9103", "listen address")
 	preload := flag.Bool("preload", false, "load the default model at startup")
+	vadModel := flag.String("vad-model", "", "Silero VAD model path; empty disables")
 	flag.Parse()
 
 	cfg, err := config.Load(config.FilePath())
@@ -69,10 +73,23 @@ func main() {
 			http.Error(w, "GET required", http.StatusMethodNotAllowed)
 			return
 		}
-		handleStream(w, r, eng)
+		handleStream(w, r, eng, *vadModel)
 	})
 
+	if *vadModel == "" {
+		*vadModel = os.Getenv("SONUS_VAD_MODEL")
+	}
+	if *vadModel == "" {
+		candidate := filepath.Join(cfg.Paths.Models, "vad", "silero_vad.onnx")
+		if _, err := os.Stat(candidate); err == nil {
+			*vadModel = candidate
+		}
+	}
+
 	log.Printf("streamd %s on %s (model %s)", version, *addr, model.ID)
+	if *vadModel != "" {
+		log.Printf("VAD: %s", *vadModel)
+	}
 	if *preload {
 		if err := mgr.Load(model.ID); err != nil {
 			log.Printf("preload: %v", err)
@@ -88,7 +105,7 @@ type message struct {
 	Text string `json:"text,omitempty"`
 }
 
-func handleStream(w http.ResponseWriter, r *http.Request, eng *streamengine.Engine) {
+func handleStream(w http.ResponseWriter, r *http.Request, eng *streamengine.Engine, vadModel string) {
 	c, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
@@ -103,8 +120,41 @@ func handleStream(w http.ResponseWriter, r *http.Request, eng *streamengine.Engi
 	}
 	defer sess.Close()
 
+	var gate *vad.VAD
+	if vadModel != "" {
+		gate, err = vad.Open(vadModel)
+		if err != nil {
+			log.Printf("VAD: %v", err)
+		} else {
+			defer gate.Close()
+		}
+	}
+
 	var leftover []byte
+	var preroll [][]float32
+	active := gate == nil
 	last := ""
+	emit := func(samples []float32) error {
+		text, endpoint := sess.Feed(samples)
+		if text != "" && text != last {
+			last = text
+			if err := writeJSON(r.Context(), c, message{Type: "partial", Text: text}); err != nil {
+				return err
+			}
+		}
+		if endpoint {
+			if text != "" {
+				if err := writeJSON(r.Context(), c, message{Type: "final", Text: text}); err != nil {
+					return err
+				}
+			}
+			last = ""
+			active = gate != nil
+			preroll = nil
+		}
+		return nil
+	}
+
 	for {
 		typ, data, err := c.Read(r.Context())
 		if err != nil {
@@ -127,20 +177,28 @@ func handleStream(w http.ResponseWriter, r *http.Request, eng *streamengine.Engi
 		if len(data) == 0 {
 			continue
 		}
-		text, endpoint := sess.Feed(pcm16(data))
-		if text != "" && text != last {
-			last = text
-			if err := writeJSON(r.Context(), c, message{Type: "partial", Text: text}); err != nil {
-				return
+		samples := pcm16(data)
+		if gate != nil {
+			speech := gate.Speech(samples)
+			if !speech && !active {
+				preroll = append(preroll, samples)
+				if len(preroll) > 10 {
+					preroll = preroll[1:]
+				}
+				continue
+			}
+			if speech && !active {
+				active = true
+				for _, p := range preroll {
+					if err := emit(p); err != nil {
+						return
+					}
+				}
+				preroll = nil
 			}
 		}
-		if endpoint {
-			if text != "" {
-				if err := writeJSON(r.Context(), c, message{Type: "final", Text: text}); err != nil {
-					return
-				}
-			}
-			last = ""
+		if err := emit(samples); err != nil {
+			return
 		}
 	}
 	final := sess.Finish()

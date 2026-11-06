@@ -49,14 +49,12 @@ Revisado en `cmd/`, `internal/` y los tests:
 
 ### Prioridad alta
 
-1. **VAD real y solapamiento en ASR.** `streamctl listen` ya tiene un gate de energía y corta por
-   silencio, pero no es Silero VAD; para audio con ruido conviene un VAD dedicado. Auris offline
-   sigue cortando cada 30 s sin overlap; la práctica recomendada es VAD y 2–3 s de overlap con
-   deduplicación de texto.
-2. **Streaming ASR: calidad y VAD del servidor.** El componente `streamd` ya acepta PCM16 por
-   WebSocket y devuelve parciales con Kroko; el host ya filtra voz con un gate. Falta VAD dedicado
-   del lado del servidor, ajustar endpoint/overlap y medir WER en español; hoy el corte final lo
-   decide el modelo con `EnableEndpoint`.
+1. **VAD y solapamiento en ASR.** `streamctl listen` tiene gate de energía en el host y `streamd`
+   puede usar Silero VAD en el servidor (`streamctl vad install`). Auris offline sigue cortando cada
+   30 s sin overlap; para archivos largos conviene VAD + 2–3 s de overlap con deduplicación.
+2. **Streaming ASR: calidad.** `streamd` ya acepta PCM16 por WebSocket, usa Silero VAD opcional y
+   devuelve parciales con Kroko. Falta ajustar endpoint/overlap y medir WER en español; el corte
+   final lo decide `EnableEndpoint`.
 3. **Concurrencia del motor.** `Engine.Speak` y `Engine.Transcribe` serializan todo con un mutex:
    evita OOM, pero un job largo bloquea a los demás. Medir y decidir pool o límite de cola.
 

@@ -49,9 +49,13 @@ entrenado para streaming.
 
 ```bash
 streamctl models install kroko-es-64l
+streamctl vad install
 streamctl service load kroko-es-64l
 streamctl stream audio.wav
 ```
+
+`streamctl vad install` baja Silero VAD a `<models>/vad/silero_vad.onnx`. `streamd` lo detecta solo y
+filtra silencio/ruido antes de alimentar el reconocedor. Si el archivo no existe, sigue sin VAD.
 
 - `kroko-es-64l` es el default: más rápido, buena precisión.
 - `kroko-es-128l` es la variante de mayor precisión; más cómputo por chunk.
@@ -60,6 +64,8 @@ streamctl stream audio.wav
 - `streamctl listen` captura del micrófono con `parec`/`arecord`, aplica un gate de energía y manda
   sólo voz; corta al detectar `--silence-ms` de silencio. El micrófono vive en el host, no en el
   contenedor.
+- `streamd` usa Silero VAD del lado del servidor si existe `<models>/vad/silero_vad.onnx`; filtra
+  ruido y precarga 200 ms antes del inicio de voz.
 - El plugin de Hermes Desktop `integrations/hermes-desktop/sonus-read/` consume `message.delta` y
   manda cada frase a `/v1/speech/stream`; ver su README.
 
