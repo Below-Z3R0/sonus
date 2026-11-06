@@ -32,7 +32,7 @@ func main() {
 		if st := modeldl.Status(cfg.Paths.Models, id); st.State != "ready" {
 			return fmt.Errorf("%s no está instalado", id)
 		}
-		return nil
+		return fmt.Errorf("engine not wired: Kokoro ONNX pendiente")
 	}, func() {})
 	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
 	api.RegisterLifecycle(mux, mgr)
