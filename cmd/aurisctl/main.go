@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -132,20 +133,24 @@ func transcribe(base, path, out string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("auris: %s: %s", resp.Status, string(raw))
 	}
+	var result struct {
+		Text string `json:"text"`
+		Lang string `json:"lang"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return fmt.Errorf("auris: respuesta inválida: %w", err)
+	}
 	if out != "" {
 		if err := os.MkdirAll(out, 0o755); err != nil {
 			return err
 		}
 		name := filepath.Join(out, filepath.Base(path)+".txt")
-		if err := os.WriteFile(name, raw, 0o644); err != nil {
+		if err := os.WriteFile(name, []byte(result.Text+"\n"), 0o644); err != nil {
 			return err
 		}
 		fmt.Println(name)
 		return nil
 	}
-	_, err = os.Stdout.Write(raw)
-	if err == nil && len(raw) > 0 && raw[len(raw)-1] != '\n' {
-		fmt.Println()
-	}
-	return err
+	fmt.Println(result.Text)
+	return nil
 }

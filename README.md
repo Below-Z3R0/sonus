@@ -9,8 +9,8 @@ Comparte las bases `b3l0w-ort:*` con Argos. Los modelos viven en un volumen, no 
 
 ## Estado
 
-Scaffold funcional con Vox conectado: `voxd` carga Kokoro ONNX, usa `misakid` como frontend de
-texto y devuelve WAV real en español e inglés. Auris (Whisper) sigue pendiente.
+Scaffold funcional con Vox y Auris conectados: `voxd` carga Kokoro ONNX, usa `misakid` como
+frontend de texto y devuelve WAV real; `aurisd` carga Whisper ONNX y transcribe WAV a texto.
 
 ## Desarrollo
 
@@ -58,6 +58,18 @@ voxctl speak "texto largo" --file texto.txt --out texto.wav
 
 Voces Kokoro incluidas en el preset: `em_santa` (es, sid 53), `ef_dora` (es, sid 28),
 `em_alex` (es, sid 29), `af_heart` (en-US, sid 3), `am_puck` (en-US, sid 18).
+
+## Transcribir audio
+
+```bash
+aurisctl models install whisper-turbo-onnx
+aurisctl service load whisper-turbo-onnx
+aurisctl transcribe audio.wav
+aurisctl transcribe audio.wav --out transcripciones
+```
+
+La entrada es WAV PCM; sherpa remuestrea a 16 kHz. La salida es texto plano, con el idioma detectado
+por Whisper en la respuesta HTTP.
 
 ## Ciclo de vida del modelo
 
