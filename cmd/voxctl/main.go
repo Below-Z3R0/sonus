@@ -58,7 +58,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|config get|set|reset|jobs list|status|wait|speak \"texto\" [--file F] [--lang auto] [--voice V] [--out F] [--async|--stream]")
 }
 
 func voicesCmd() error {
@@ -140,6 +140,7 @@ func speakCmd(base string, args []string) error {
 	voice := fs.String("voice", "", "voice id (default: model voice for lang)")
 	lang := fs.String("lang", "auto", "language code (auto, es, en, ...)")
 	async := fs.Bool("async", false, "return a job id instead of waiting for audio")
+	stream := fs.Bool("stream", false, "stream raw PCM16 audio")
 	flags, positional := cliutil.SplitFlags(args, map[string]bool{
 		"--file": true, "-file": true,
 		"--out": true, "-out": true,
@@ -166,7 +167,46 @@ func speakCmd(base string, args []string) error {
 	if *async {
 		return speakAsync(base, text, *lang, *voice)
 	}
+	if *stream {
+		return speakStream(base, text, *lang, *voice, *out)
+	}
 	return speak(base, text, *lang, *voice, *out)
+}
+
+func speakStream(base, text, lang, voice, out string) error {
+	body, err := json.Marshal(map[string]string{"text": text, "lang": lang, "voice": voice})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, base+"/v1/speech/stream", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return fmt.Errorf("vox: %s: %s", resp.Status, string(raw))
+	}
+	var dst io.Writer = os.Stdout
+	var f *os.File
+	if out != "" {
+		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+			return err
+		}
+		f, err = os.Create(out)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		dst = f
+	}
+	_, err = io.Copy(dst, resp.Body)
+	return err
 }
 
 func speakAsync(base, text, lang, voice string) error {

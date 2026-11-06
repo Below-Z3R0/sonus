@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -25,6 +28,24 @@ type speechRequest struct {
 	Text  string `json:"text"`
 	Lang  string `json:"lang"`
 	Voice string `json:"voice"`
+}
+
+func writePCM(w io.Writer, samples []float32) error {
+	var buf [2]byte
+	for _, sample := range samples {
+		v := int32(math.Round(float64(sample) * 32767))
+		if v > math.MaxInt16 {
+			v = math.MaxInt16
+		}
+		if v < math.MinInt16 {
+			v = math.MinInt16
+		}
+		binary.LittleEndian.PutUint16(buf[:], uint16(int16(v)))
+		if _, err := w.Write(buf[:]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseSpeech(w http.ResponseWriter, r *http.Request) (speechRequest, bool) {
@@ -145,6 +166,35 @@ func main() {
 		})
 		w.WriteHeader(http.StatusAccepted)
 		api.WriteJSON(w, map[string]string{"job_id": id})
+	})
+	mux.HandleFunc("/v1/speech/stream", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST required", http.StatusMethodNotAllowed)
+			return
+		}
+		req, ok := parseSpeech(w, r)
+		if !ok {
+			return
+		}
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming no soportado", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/L16")
+		w.Header().Set("X-Audio-Format", "pcm_s16le")
+		w.Header().Set("X-Sample-Rate", "24000")
+		w.Header().Set("Cache-Control", "no-cache")
+		err := eng.Stream(r.Context(), req.Text, req.Lang, req.Voice, func(samples []float32, _ int) error {
+			if err := writePCM(w, samples); err != nil {
+				return err
+			}
+			flusher.Flush()
+			return nil
+		})
+		if err != nil {
+			log.Printf("speech stream: %v", err)
+		}
 	})
 	mux.HandleFunc("/v1/voices", func(w http.ResponseWriter, _ *http.Request) {
 		api.WriteJSON(w, model.Voices)

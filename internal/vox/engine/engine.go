@@ -97,22 +97,21 @@ func (e *Engine) Health(ctx context.Context) error {
 	return e.phon.Health(ctx)
 }
 
-// Speak phonemizes with misakid and synthesizes a WAV. Long text is split
-// into chunks, and each chunk detects its own language when lang is auto.
-func (e *Engine) Speak(ctx context.Context, text, lang, voiceID string) ([]byte, error) {
+// Stream synthesizes each text chunk and emits PCM samples as soon as they
+// are ready. The caller can write them to an HTTP stream or an audio player.
+func (e *Engine) Stream(ctx context.Context, text, lang, voiceID string, emit func([]float32, int) error) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.tts == nil {
-		return nil, errors.New("modelo no cargado")
+		return errors.New("modelo no cargado")
 	}
 	if strings.TrimSpace(text) == "" {
-		return nil, errors.New("texto vacío")
+		return errors.New("texto vacío")
 	}
 	chunks := SplitText(text, e.model.Profile.MaxChars)
 	if len(chunks) == 0 {
-		return nil, errors.New("texto vacío")
+		return errors.New("texto vacío")
 	}
-	var samples []float32
 	var sampleRate int
 	for i, chunk := range chunks {
 		chunkLang := lang
@@ -121,11 +120,11 @@ func (e *Engine) Speak(ctx context.Context, text, lang, voiceID string) ([]byte,
 		}
 		voice, err := VoiceFor(e.model, chunkLang, voiceID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		ph, err := e.phon.Phonemize(ctx, chunk, chunkLang)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		audio := e.tts.GenerateWithConfig("", &sherpa.GenerationConfig{
 			Sid:               voice.SID,
@@ -133,17 +132,40 @@ func (e *Engine) Speak(ctx context.Context, text, lang, voiceID string) ([]byte,
 			PhonemeCodepoints: [][]int32{ph.Codepoints},
 		}, nil)
 		if audio == nil || len(audio.Samples) == 0 {
-			return nil, errors.New("Kokoro no generó audio")
+			return errors.New("Kokoro no generó audio")
 		}
 		if sampleRate == 0 {
 			sampleRate = audio.SampleRate
 		} else if audio.SampleRate != sampleRate {
-			return nil, errors.New("Kokoro cambió el sample rate entre chunks")
+			return errors.New("Kokoro cambió el sample rate entre chunks")
 		}
 		if i > 0 {
-			samples = append(samples, make([]float32, sampleRate/20)...) // 50 ms
+			if err := emit(make([]float32, sampleRate/20), sampleRate); err != nil {
+				return err
+			}
 		}
-		samples = append(samples, audio.Samples...)
+		if err := emit(audio.Samples, sampleRate); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Speak returns a complete WAV built from the same chunks as Stream.
+func (e *Engine) Speak(ctx context.Context, text, lang, voiceID string) ([]byte, error) {
+	var samples []float32
+	var sampleRate int
+	err := e.Stream(ctx, text, lang, voiceID, func(chunk []float32, rate int) error {
+		if sampleRate == 0 {
+			sampleRate = rate
+		} else if sampleRate != rate {
+			return errors.New("Kokoro cambió el sample rate entre chunks")
+		}
+		samples = append(samples, chunk...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	wav := (&sherpa.GeneratedAudio{Samples: samples, SampleRate: sampleRate}).ToBuffer()
 	if len(wav) == 0 {
