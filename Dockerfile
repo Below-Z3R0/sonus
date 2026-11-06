@@ -12,6 +12,8 @@ RUN CGO_ENABLED=1 go test ./... \
     && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/bin/aurisctl ./cmd/aurisctl \
     && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/bin/voxd ./cmd/voxd \
     && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/bin/voxctl ./cmd/voxctl \
+    && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/bin/streamd ./cmd/streamd \
+    && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/bin/streamctl ./cmd/streamctl \
     && CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o /out/bin/sonus-mcp ./cmd/sonus-mcp \
     && cp -a /go/pkg/mod/github.com/k2-fsa/sherpa-onnx-go-linux/v2@v2.0.1/lib/x86_64-unknown-linux-gnu/. /out/lib/
 

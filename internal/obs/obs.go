@@ -2,6 +2,9 @@
 package obs
 
 import (
+	"bufio"
+	"errors"
+	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -50,4 +53,12 @@ func (r *statusRecorder) Flush() {
 	if f, ok := r.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("hijacking no soportado")
+	}
+	return h.Hijack()
 }

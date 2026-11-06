@@ -3,6 +3,7 @@ module github.com/Below-Z3R0/sonus
 go 1.27
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/k2-fsa/sherpa-onnx-go/v2 v2.0.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pemistahl/lingua-go v1.4.0

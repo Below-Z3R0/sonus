@@ -18,6 +18,7 @@ var Keys = []string{
 	"paths.output",
 	"defaults.asr",
 	"defaults.tts",
+	"defaults.stream",
 	"services.phonemizer",
 }
 

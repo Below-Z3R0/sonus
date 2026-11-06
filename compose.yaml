@@ -14,17 +14,38 @@ services:
 
   mcp:
     image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
-    command: ["sonus-mcp", "--addr", "0.0.0.0:9201", "--vox", "http://vox:9102", "--auris", "http://auris:9101"]
+    command: ["sonus-mcp", "--addr", "0.0.0.0:9201", "--vox", "http://vox:9102", "--auris", "http://auris:9101", "--stream", "http://stream:9103"]
     restart: unless-stopped
     depends_on:
       vox:
         condition: service_healthy
       auris:
         condition: service_healthy
+      stream:
+        condition: service_healthy
     ports:
       - "127.0.0.1:9201:9201"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9201/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  stream:
+    image: ghcr.io/below-z3r0/sonus:${VARIANT:-cpu}
+    command: ["streamd", "--addr", "0.0.0.0:9103"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9103:9103"
+    volumes:
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/models:/models
+      - ${SONUS_HOME:-${HOME}/.local/share/sonus}/data:/data
+    environment:
+      SONUS_MODELS_DIR: /models
+      SONUS_DATA_DIR: /data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9103/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

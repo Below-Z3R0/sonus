@@ -40,6 +40,34 @@ Servicios:
 | auris | http://127.0.0.1:9101 | transcripción |
 | vox | http://127.0.0.1:9102 | síntesis de voz |
 | misakid | interno :9200 | frontend de texto para Kokoro |
+| stream | http://127.0.0.1:9103 | ASR streaming por WebSocket |
+
+## Auris Stream
+
+Componente separado para micrófono en vivo. No usa Whisper offline: usa un Zipformer2 transducer
+entrenado para streaming.
+
+```bash
+streamctl models install kroko-es-64l
+streamctl service load kroko-es-64l
+streamctl stream audio.wav
+```
+
+- `kroko-es-64l` es el default: más rápido, buena precisión.
+- `kroko-es-128l` es la variante de mayor precisión; más cómputo por chunk.
+- `streamctl stream archivo.wav` abre `ws://127.0.0.1:9103/v1/stream`, manda PCM16 16 kHz por chunks y
+  muestra `partial`/`final`.
+
+Protocolo WebSocket:
+
+```text
+cliente → servidor: frames binarios PCM16 LE, 16 kHz, mono
+servidor → cliente: {"type":"partial","text":"..."}
+                    {"type":"final","text":"..."}
+cliente → servidor: texto "done" para cerrar la utterance
+```
+
+Catálogo propio en `internal/stream/catalog`; no comparte IDs ni archivos con Auris/Whisper.
 
 ## Sintetizar voz
 

@@ -18,6 +18,7 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/cliutil"
 	"github.com/Below-Z3R0/sonus/internal/config"
 	"github.com/Below-Z3R0/sonus/internal/modeldl"
+	streamcatalog "github.com/Below-Z3R0/sonus/internal/stream/catalog"
 	voxcatalog "github.com/Below-Z3R0/sonus/internal/vox/catalog"
 )
 
@@ -105,6 +106,10 @@ func configCmd(args []string) error {
 		case "defaults.tts":
 			if _, ok := voxcatalog.Get(value); !ok {
 				return fmt.Errorf("modelo TTS desconocido: %s", value)
+			}
+		case "defaults.stream":
+			if _, ok := streamcatalog.Get(value); !ok {
+				return fmt.Errorf("modelo streaming desconocido: %s", value)
 			}
 		case "paths.models", "paths.data", "paths.media", "paths.output", "services.phonemizer":
 			if value == "" {

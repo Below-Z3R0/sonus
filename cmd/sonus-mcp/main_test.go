@@ -22,7 +22,7 @@ func TestServerTools(t *testing.T) {
 	defer ts.Close()
 
 	d := &daemon{name: "vox", base: ts.URL, http: http.DefaultClient}
-	srv := newServer(d, d, false)
+	srv := newServer(d, d, d, false)
 	ctx := context.Background()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	ss, err := srv.Connect(ctx, serverTransport, nil)
@@ -48,7 +48,7 @@ func TestServerTools(t *testing.T) {
 
 func TestReadOnly(t *testing.T) {
 	d := &daemon{name: "vox", base: "http://127.0.0.1:1", http: http.DefaultClient}
-	srv := newServer(d, d, true)
+	srv := newServer(d, d, d, true)
 	ctx := context.Background()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	ss, err := srv.Connect(ctx, serverTransport, nil)

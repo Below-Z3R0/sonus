@@ -17,8 +17,9 @@ type Paths struct {
 }
 
 type Defaults struct {
-	ASR string `yaml:"asr"`
-	TTS string `yaml:"tts"`
+	ASR    string `yaml:"asr"`
+	TTS    string `yaml:"tts"`
+	Stream string `yaml:"stream"`
 }
 
 type Services struct {
@@ -49,7 +50,7 @@ func Default() Config {
 			Media:  envOr("SONUS_MEDIA", filepath.Join(home(), "Media")),
 			Output: envOr("SONUS_OUTPUT", filepath.Join(base, "output")),
 		},
-		Defaults: Defaults{ASR: "whisper-turbo-onnx", TTS: "kokoro-82m-onnx"},
+		Defaults: Defaults{ASR: "whisper-turbo-onnx", TTS: "kokoro-82m-onnx", Stream: "kroko-es-64l"},
 		Services: Services{Phonemizer: envOr("SONUS_PHONEMIZER_URL", "http://127.0.0.1:9200")},
 	}
 }

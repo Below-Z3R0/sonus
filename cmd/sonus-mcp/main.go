@@ -30,13 +30,14 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:9201", "MCP listen address")
 	voxURL := flag.String("vox", "http://127.0.0.1:9102", "voxd base URL")
 	aurisURL := flag.String("auris", "http://127.0.0.1:9101", "aurisd base URL")
+	streamURL := flag.String("stream", "http://127.0.0.1:9103", "streamd base URL")
 	readOnly := flag.Bool("read-only", false, "disable write tools")
 	flag.Parse()
 
 	vox := &daemon{name: "vox", base: *voxURL, http: &http.Client{Timeout: 2 * time.Minute}}
 	auris := &daemon{name: "auris", base: *aurisURL, http: &http.Client{Timeout: 10 * time.Minute}}
-
-	srv := newServer(vox, auris, *readOnly)
+	stream := &daemon{name: "stream", base: *streamURL, http: &http.Client{Timeout: 10 * time.Second}}
+	srv := newServer(vox, auris, stream, *readOnly)
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, nil)
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", handler)
@@ -48,21 +49,26 @@ func main() {
 	}
 }
 
-func newServer(vox, auris *daemon, readOnly bool) *mcp.Server {
+func newServer(vox, auris, stream *daemon, readOnly bool) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "sonus", Version: "0.1.0"}, nil)
 	registerStatus(srv, vox)
 	registerStatus(srv, auris)
+	registerStatus(srv, stream)
 	registerModels(srv, vox)
 	registerModels(srv, auris)
+	registerModels(srv, stream)
 	registerJobs(srv, vox)
 	registerJobs(srv, auris)
+	registerJobs(srv, stream)
 	if !readOnly {
 		mcp.AddTool(srv, &mcp.Tool{Name: "vox_speak", Description: "Queue text-to-speech with Kokoro; returns a job id"}, voxSpeak(vox))
 		mcp.AddTool(srv, &mcp.Tool{Name: "auris_transcribe", Description: "Transcribe an audio file with Whisper; returns text or a job id"}, aurisTranscribe(auris))
 		mcp.AddTool(srv, &mcp.Tool{Name: "vox_load", Description: "Load a Kokoro model into voxd"}, loadTool(vox))
 		mcp.AddTool(srv, &mcp.Tool{Name: "auris_load", Description: "Load a Whisper model into aurisd"}, loadTool(auris))
+		mcp.AddTool(srv, &mcp.Tool{Name: "stream_load", Description: "Load a streaming Kroko model into streamd"}, loadTool(stream))
 		mcp.AddTool(srv, &mcp.Tool{Name: "vox_unload", Description: "Unload the resident Kokoro model"}, unloadTool(vox))
 		mcp.AddTool(srv, &mcp.Tool{Name: "auris_unload", Description: "Unload the resident Whisper model"}, unloadTool(auris))
+		mcp.AddTool(srv, &mcp.Tool{Name: "stream_unload", Description: "Unload the resident streaming model"}, unloadTool(stream))
 	}
 	return srv
 }
