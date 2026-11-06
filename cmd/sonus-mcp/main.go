@@ -59,7 +59,6 @@ func newServer(vox, auris, stream *daemon, readOnly bool) *mcp.Server {
 	registerModels(srv, stream)
 	registerJobs(srv, vox)
 	registerJobs(srv, auris)
-	registerJobs(srv, stream)
 	if !readOnly {
 		mcp.AddTool(srv, &mcp.Tool{Name: "vox_speak", Description: "Queue text-to-speech with Kokoro; returns a job id"}, voxSpeak(vox))
 		mcp.AddTool(srv, &mcp.Tool{Name: "auris_transcribe", Description: "Transcribe an audio file with Whisper; returns text or a job id"}, aurisTranscribe(auris))
