@@ -7,6 +7,7 @@ import (
 
 	"github.com/Below-Z3R0/sonus/internal/api"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/runtime"
 	"github.com/Below-Z3R0/sonus/internal/vox/catalog"
 )
 
@@ -25,7 +26,9 @@ func main() {
 		model = m
 	}
 
-	mux := api.Handler("vox", version, model.ID, catalog.List())
+	mgr := runtime.New("vox", version, model.ID, func(string) error { return nil }, func() {})
+	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
+	api.RegisterLifecycle(mux, mgr)
 	mux.HandleFunc("/v1/speech", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "speech engine not wired yet", http.StatusNotImplemented)
 	})

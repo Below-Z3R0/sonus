@@ -8,6 +8,7 @@ import (
 	"github.com/Below-Z3R0/sonus/internal/api"
 	"github.com/Below-Z3R0/sonus/internal/auris/catalog"
 	"github.com/Below-Z3R0/sonus/internal/config"
+	"github.com/Below-Z3R0/sonus/internal/runtime"
 )
 
 const version = "0.1.0"
@@ -25,7 +26,9 @@ func main() {
 		model = m
 	}
 
-	mux := api.Handler("auris", version, model.ID, catalog.List())
+	mgr := runtime.New("auris", version, model.ID, func(string) error { return nil }, func() {})
+	mux := api.Handler(func() any { return mgr.Status() }, catalog.List())
+	api.RegisterLifecycle(mux, mgr)
 	mux.HandleFunc("/v1/transcribe", func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "transcription engine not wired yet", http.StatusNotImplemented)
 	})

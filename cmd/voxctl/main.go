@@ -37,6 +37,8 @@ func main() {
 		err = voicesCmd()
 	case "models":
 		err = modelsCmd(os.Args[2:])
+	case "service":
+		err = cliutil.Service(base, os.Args[2:])
 	case "speak":
 		err = speakCmd(base, os.Args[2:])
 	default:
@@ -50,7 +52,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "voxctl version|status|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--voice V] [--out F]")
+	fmt.Fprintln(os.Stderr, "voxctl version|status|service status|load <model>|unload|voices|models list|show <id>|use <id>|speak \"texto\" [--file F] [--voice V] [--out F]")
 }
 
 func voicesCmd() error {

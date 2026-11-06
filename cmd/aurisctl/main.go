@@ -35,6 +35,8 @@ func main() {
 		err = cliutil.PrintGet(base+"/v1/status", 10*time.Second)
 	case "models":
 		err = modelsCmd(os.Args[2:])
+	case "service":
+		err = cliutil.Service(base, os.Args[2:])
 	case "transcribe":
 		err = transcribeCmd(base, os.Args[2:])
 	default:
@@ -48,7 +50,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "aurisctl version|status|models list|show <id>|use <id>|transcribe <archivo> [--out DIR]")
+	fmt.Fprintln(os.Stderr, "aurisctl version|status|service status|load <model>|unload|models list|show <id>|use <id>|transcribe <archivo> [--out DIR]")
 }
 
 func modelsCmd(args []string) error {

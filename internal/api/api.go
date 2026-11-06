@@ -13,15 +13,13 @@ import (
 	"time"
 )
 
-func Handler(name, version, model string, models any) *http.ServeMux {
+func Handler(status func() any, models any) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
 	mux.HandleFunc("/v1/status", func(w http.ResponseWriter, _ *http.Request) {
-		WriteJSON(w, map[string]any{
-			"service": name, "version": version, "state": "scaffold", "model": model,
-		})
+		WriteJSON(w, status())
 	})
 	mux.HandleFunc("/v1/models", func(w http.ResponseWriter, _ *http.Request) {
 		WriteJSON(w, models)

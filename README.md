@@ -40,6 +40,25 @@ Servicios:
 | auris | http://127.0.0.1:9101 | transcripción |
 | vox | http://127.0.0.1:9102 | síntesis de voz |
 
+## Ciclo de vida del modelo
+
+Cada servicio mantiene **un solo modelo residente**:
+
+```bash
+voxctl service status
+voxctl service load kokoro-82m-onnx
+voxctl service unload
+```
+
+`unload` cierra el modelo y llama `debug.FreeOSMemory`; el contenedor, el HTTP y el MCP (cuando esté)
+siguen vivos. No hace falta apagar Docker para liberar RAM.
+
+`models use <id>` solo cambia el default; para aplicarlo ahora:
+
+```bash
+voxctl service load <id>
+```
+
 ## Modelos
 
 Catálogos separados, como Argos:
